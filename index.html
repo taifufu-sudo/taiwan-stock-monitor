@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>台股核心持股監控看板 v2</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --bg: #0f0f11; --bg2: #17171a; --bg3: #1e1e22;
+    --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.14);
+    --text: #e8e6df; --text2: #9c9a92; --text3: #5c5b56;
+    --green: #4ade80; --green-bg: rgba(74,222,128,0.1); --green-border: rgba(74,222,128,0.3);
+    --red: #f87171; --red-bg: rgba(248,113,113,0.1); --red-border: rgba(248,113,113,0.3);
+    --amber: #fbbf24; --amber-bg: rgba(251,191,36,0.08); --amber-border: rgba(251,191,36,0.3);
+    --blue: #60a5fa; --blue-bg: rgba(96,165,250,0.1);
+    --purple: #a78bfa; --accent: #534AB7;
+    --radius: 10px; --radius-sm: 6px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue','PingFang TC','Microsoft JhengHei',sans-serif; font-size: 14px; line-height: 1.5; min-height: 100vh; }
+  .app { max-width: 960px; margin: 0 auto; padding: 24px 16px 60px; }
+
+  /* Header */
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+  .header-left h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.3px; }
+  .header-left p { font-size: 12px; color: var(--text2); margin-top: 4px; }
+  .live-badge { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--green); background: var(--green-bg); border: 0.5px solid var(--green-border); border-radius: 20px; padding: 4px 10px; }
+  .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  /* Token bar */
+  .token-bar { display: flex; gap: 8px; align-items: center; background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 8px; }
+  .token-bar label { font-size: 12px; color: var(--text2); white-space: nowrap; }
+  .token-bar input { flex: 1; background: var(--bg3); border: 0.5px solid var(--border2); border-radius: var(--radius-sm); color: var(--text); font-size: 12px; padding: 6px 10px; outline: none; }
+  .token-bar input:focus { border-color: var(--accent); }
+  .token-note { font-size: 11px; color: var(--text3); margin-bottom: 20px; }
+  .token-note a { color: var(--blue); text-decoration: none; }
+
+  /* Buttons */
+  button { cursor: pointer; border: 0.5px solid var(--border2); border-radius: var(--radius-sm); background: var(--bg2); color: var(--text2); font-size: 12px; padding: 7px 14px; transition: all 0.15s; font-family: inherit; }
+  button:hover { background: var(--bg3); color: var(--text); }
+  button.primary { background: var(--accent); color: #fff; border-color: transparent; }
+  button.primary:hover { opacity: 0.85; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .err { background: var(--red-bg); border: 0.5px solid var(--red-border); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 12px; color: var(--red); margin-bottom: 12px; display: none; }
+
+  /* ── OVERVIEW PANEL ── */
+  .overview { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; margin-bottom: 24px; }
+  .ov-card { background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 14px 16px; cursor: pointer; transition: border-color 0.15s; }
+  .ov-card:hover { border-color: var(--border2); }
+  .ov-card.active { border-color: var(--accent); }
+  .ov-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .ov-name { font-size: 13px; font-weight: 600; }
+  .ov-code { font-size: 11px; color: var(--text3); margin-top: 1px; }
+  .ov-price { font-size: 18px; font-weight: 600; letter-spacing: -0.5px; text-align: right; }
+  .ov-chg { font-size: 11px; text-align: right; margin-top: 2px; }
+  /* Alert badge on overview card */
+  .ov-alert { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 14px; border: 0.5px solid; }
+  .ov-alert.BUY    { background: var(--green-bg); border-color: var(--green-border); color: var(--green); }
+  .ov-alert.WATCH  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .ov-alert.CAUTION{ background: var(--red-bg);   border-color: var(--red-border);   color: var(--red);   }
+  .ov-alert.HOLD   { background: var(--blue-bg);  border-color: rgba(96,165,250,.3); color: var(--blue);  }
+  .ov-mini-bars { display: flex; gap: 3px; align-items: flex-end; height: 28px; margin-top: 8px; }
+  .ov-bar { flex: 1; border-radius: 2px 2px 0 0; background: rgba(255,255,255,0.1); }
+
+  /* Stock tabs */
+  .stock-tabs { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; }
+  .stab { padding: 8px 16px; font-size: 13px; border-radius: 24px; border: 0.5px solid var(--border2); color: var(--text2); background: transparent; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 8px; }
+  .stab.active { background: var(--accent); border-color: transparent; color: #fff; }
+  .chg-up { color: var(--green); } .chg-dn { color: var(--red); } .chg-neu { color: var(--text3); }
+  .stab.active .chg-up, .stab.active .chg-dn, .stab.active .chg-neu { color: rgba(255,255,255,.7); }
+
+  /* Metrics */
+  .metrics { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 16px; }
+  @media(max-width:600px){ .metrics{grid-template-columns:repeat(2,1fr);} }
+  .mc { background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
+  .mc-label { font-size: 11px; color: var(--text3); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .05em; }
+  .mc-val { font-size: 20px; font-weight: 600; letter-spacing: -.5px; }
+  .mc-sub { font-size: 11px; color: var(--text2); margin-top: 3px; }
+
+  /* SL/TP pills */
+  .sltp-row { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .sltp-pill { flex: 1; min-width: 100px; background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 8px 12px; text-align: center; }
+  .sltp-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 3px; }
+  .sltp-val { font-size: 15px; font-weight: 600; }
+  .sltp-pill.entry .sltp-val { color: var(--blue); }
+  .sltp-pill.tp1   .sltp-val { color: #86efac; }
+  .sltp-pill.tp2   .sltp-val { color: var(--green); }
+  .sltp-pill.sl    .sltp-val { color: var(--red); }
+
+  /* Period */
+  .period-row { display: flex; gap: 4px; margin-bottom: 12px; align-items: center; }
+  .period-row span { font-size: 11px; color: var(--text3); margin-right: 6px; text-transform: uppercase; letter-spacing: .05em; }
+  .pbtn { padding: 4px 12px; font-size: 12px; border-radius: 16px; }
+  .pbtn.active { background: var(--bg3); border-color: var(--border2); color: var(--text); }
+
+  /* Chart */
+  .chart-card { background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 16px; }
+  .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .chart-header h3 { font-size: 13px; font-weight: 500; color: var(--text2); }
+  .chart-legend { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text3); }
+  .legend-dot { width: 20px; height: 2px; border-radius: 1px; }
+  .chart-wrap { position: relative; width: 100%; height: 260px; }
+
+  /* Indicators */
+  .ind-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 16px; }
+  @media(max-width:600px){ .ind-grid{grid-template-columns:repeat(2,1fr);} }
+  .ind-card { background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
+  .ind-name { font-size: 11px; color: var(--text3); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; }
+  .ind-val { font-size: 18px; font-weight: 600; letter-spacing: -.3px; }
+  .ind-bar-bg { height: 3px; background: rgba(255,255,255,.07); border-radius: 2px; margin-top: 8px; }
+  .ind-bar-fill { height: 3px; border-radius: 2px; transition: width .6s ease; }
+  .c-green{color:var(--green)} .c-amber{color:var(--amber)} .c-red{color:var(--red)} .c-blue{color:var(--blue)}
+
+  /* Chip */
+  .chip-card { background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 16px; }
+  .chip-card h3 { font-size: 13px; font-weight: 500; color: var(--text2); margin-bottom: 14px; }
+  .chip-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .chip-name { font-size: 12px; color: var(--text2); min-width: 44px; }
+  .chip-bar-bg { flex: 1; background: rgba(255,255,255,.06); border-radius: 3px; height: 6px; overflow: hidden; }
+  .chip-bar-fill { height: 6px; border-radius: 3px; transition: width .8s ease; }
+  .chip-val { font-size: 13px; font-weight: 500; min-width: 80px; text-align: right; }
+  .chip-note { font-size: 11px; color: var(--text3); margin-top: 6px; }
+
+  /* ── ALERT PANEL (upgraded) ── */
+  .alert-panel { border-radius: var(--radius); border: 0.5px solid; margin-bottom: 20px; overflow: hidden; }
+  .alert-panel.BUY     { background: var(--green-bg); border-color: var(--green-border); }
+  .alert-panel.WATCH   { background: var(--amber-bg); border-color: var(--amber-border); }
+  .alert-panel.CAUTION { background: var(--red-bg);   border-color: var(--red-border); }
+  .alert-panel.HOLD    { background: var(--blue-bg);  border-color: rgba(96,165,250,.3); }
+  .alert-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px 10px; }
+  .alert-icon { font-size: 18px; line-height: 1; }
+  .alert-title { font-size: 14px; font-weight: 700; }
+  .alert-panel.BUY     .alert-title { color: var(--green); }
+  .alert-panel.WATCH   .alert-title { color: var(--amber); }
+  .alert-panel.CAUTION .alert-title { color: var(--red); }
+  .alert-panel.HOLD    .alert-title { color: var(--blue); }
+  .alert-body { padding: 0 16px 14px; font-size: 12px; color: var(--text2); line-height: 1.65; }
+  .alert-conditions { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 6px; padding: 0 16px 14px; }
+  .cond-row { display: flex; align-items: center; gap: 7px; font-size: 12px; }
+  .cond-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .cond-dot.pass { background: var(--green); }
+  .cond-dot.fail { background: var(--red); }
+  .cond-dot.neutral { background: var(--text3); }
+  .cond-text { color: var(--text2); }
+  .cond-val { color: var(--text); font-weight: 500; margin-left: auto; }
+
+  /* Catalyst timeline */
+  .catalyst-card { background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 16px; }
+  .catalyst-card h3 { font-size: 13px; font-weight: 500; color: var(--text2); margin-bottom: 14px; }
+  .cat-item { display: flex; gap: 12px; margin-bottom: 12px; }
+  .cat-item:last-child { margin-bottom: 0; }
+  .cat-date { font-size: 11px; color: var(--accent); font-weight: 600; min-width: 72px; padding-top: 1px; }
+  .cat-content { flex: 1; }
+  .cat-title { font-size: 13px; color: var(--text); font-weight: 500; margin-bottom: 2px; }
+  .cat-desc { font-size: 11px; color: var(--text3); line-height: 1.5; }
+
+  /* Loading */
+  .loading { display: flex; align-items: center; gap: 8px; color: var(--text2); font-size: 13px; padding: 20px 0; }
+  .spinner { width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Footer */
+  .footer { margin-top: 32px; padding-top: 16px; border-top: 0.5px solid var(--border); text-align: center; font-size: 11px; color: var(--text3); line-height: 1.8; }
+  .footer a { color: var(--text3); text-decoration: none; }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 2px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <h1>台股核心持股監控看板</h1>
+      <p>日月光 3711 · 台達電 2308 · 奇鋐 3017　— v2 完整警報版</p>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+      <div class="live-badge"><div class="live-dot"></div>FinMind API</div>
+      <div id="lastUpdate" style="font-size:11px;color:var(--text3)"></div>
+    </div>
+  </div>
+
+  <!-- Token -->
+  <div class="token-bar">
+    <label>FinMind Token</label>
+    <input type="password" id="tokenInput" placeholder="選填：貼上 token 可提升請求上限"/>
+    <button class="primary" onclick="applyToken()">套用</button>
+    <button onclick="loadAll()" id="refreshBtn">重新載入</button>
+  </div>
+  <p class="token-note">免費版 300次/小時，收盤後更新。免費註冊 <a href="https://finmindtrade.com" target="_blank">finmindtrade.com</a> 可升至 600次/小時。</p>
+
+  <div class="err" id="errBox"></div>
+
+  <!-- ── OVERVIEW: 三檔總覽 + 訊號狀態 ── -->
+  <div class="overview" id="overview">
+    <div class="ov-card active" onclick="selectStock('3711')" id="ov-3711">
+      <div class="ov-top">
+        <div><div class="ov-name">日月光投控</div><div class="ov-code">3711</div></div>
+        <div><div class="ov-price" id="ovp-3711">—</div><div class="ov-chg" id="ovc-3711">—</div></div>
+      </div>
+      <div id="ova-3711"><span class="ov-alert WATCH">載入中...</span></div>
+      <div class="ov-mini-bars" id="ovb-3711"></div>
+    </div>
+    <div class="ov-card" onclick="selectStock('2308')" id="ov-2308">
+      <div class="ov-top">
+        <div><div class="ov-name">台達電</div><div class="ov-code">2308</div></div>
+        <div><div class="ov-price" id="ovp-2308">—</div><div class="ov-chg" id="ovc-2308">—</div></div>
+      </div>
+      <div id="ova-2308"><span class="ov-alert WATCH">載入中...</span></div>
+      <div class="ov-mini-bars" id="ovb-2308"></div>
+    </div>
+    <div class="ov-card" onclick="selectStock('3017')" id="ov-3017">
+      <div class="ov-top">
+        <div><div class="ov-name">奇鋐</div><div class="ov-code">3017</div></div>
+        <div><div class="ov-price" id="ovp-3017">—</div><div class="ov-chg" id="ovc-3017">—</div></div>
+      </div>
+      <div id="ova-3017"><span class="ov-alert WATCH">載入中...</span></div>
+      <div class="ov-mini-bars" id="ovb-3017"></div>
+    </div>
+  </div>
+
+  <!-- Stock tabs (hidden, synced with overview) -->
+  <div class="stock-tabs" style="display:none" id="stockTabs">
+    <div class="stab active" onclick="selectStock('3711')" id="tab-3711"><span>日月光 3711</span><span class="chg chg-neu" id="chg-3711">—</span></div>
+    <div class="stab" onclick="selectStock('2308')" id="tab-2308"><span>台達電 2308</span><span class="chg chg-neu" id="chg-2308">—</span></div>
+    <div class="stab" onclick="selectStock('3017')" id="tab-3017"><span>奇鋐 3017</span><span class="chg chg-neu" id="chg-3017">—</span></div>
+  </div>
+
+  <!-- Metrics -->
+  <div class="metrics">
+    <div class="mc"><div class="mc-label">收盤價</div><div class="mc-val" id="m-close">—</div><div class="mc-sub" id="m-chg">—</div></div>
+    <div class="mc"><div class="mc-label">成交量</div><div class="mc-val" id="m-vol">—</div><div class="mc-sub" id="m-vol-sub">—</div></div>
+    <div class="mc"><div class="mc-label">52週高 / 低</div><div class="mc-val" id="m-range" style="font-size:14px">—</div><div class="mc-sub" id="m-range-sub">—</div></div>
+    <div class="mc"><div class="mc-label">距季線</div><div class="mc-val" id="m-ma60">—</div><div class="mc-sub" id="m-ma60-sub">—</div></div>
+  </div>
+
+  <!-- SL/TP pills -->
+  <div class="sltp-row" id="sltpRow"></div>
+
+  <!-- Chart -->
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3>價格走勢 K 線</h3>
+      <div class="period-row" style="margin:0">
+        <span>期間</span>
+        <button class="pbtn" onclick="setPeriod(60,this)">3M</button>
+        <button class="pbtn active" onclick="setPeriod(120,this)">6M</button>
+        <button class="pbtn" onclick="setPeriod(250,this)">1Y</button>
+      </div>
+    </div>
+    <div class="chart-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#60a5fa"></div>收盤</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fbbf24"></div>MA5</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f87171"></div>MA20</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#444441;border-top:1px dashed #444441;height:0"></div>MA60季線</div>
+    </div>
+    <div class="chart-wrap"><canvas id="priceChart"></canvas></div>
+  </div>
+
+  <!-- Indicators -->
+  <div class="ind-grid">
+    <div class="ind-card"><div class="ind-name">RSI (14)</div><div class="ind-val" id="i-rsi">—</div><div class="ind-bar-bg"><div class="ind-bar-fill" id="i-rsi-bar" style="width:0%"></div></div></div>
+    <div class="ind-card"><div class="ind-name">均線排列 MA5/20</div><div class="ind-val" id="i-ma">—</div><div class="ind-bar-bg"><div class="ind-bar-fill" id="i-ma-bar" style="width:0%"></div></div></div>
+    <div class="ind-card"><div class="ind-name">MACD 柱狀</div><div class="ind-val" id="i-macd">—</div><div class="ind-bar-bg"><div class="ind-bar-fill" id="i-macd-bar" style="width:50%"></div></div></div>
+    <div class="ind-card"><div class="ind-name">乖離率 (MA20)</div><div class="ind-val" id="i-bias">—</div><div class="ind-bar-bg"><div class="ind-bar-fill" id="i-bias-bar" style="width:50%"></div></div></div>
+    <div class="ind-card"><div class="ind-name">量能比 (5日均)</div><div class="ind-val" id="i-vol">—</div><div class="ind-bar-bg"><div class="ind-bar-fill" id="i-vol-bar" style="width:0%"></div></div></div>
+    <div class="ind-card"><div class="ind-name">布林帶位置</div><div class="ind-val" id="i-boll">—</div><div class="ind-bar-bg"><div class="ind-bar-fill" id="i-boll-bar" style="width:50%"></div></div></div>
+  </div>
+
+  <!-- Chip -->
+  <div class="chip-card">
+    <h3>三大法人近 10 個交易日累計（張）</h3>
+    <div id="chipRows"><div class="loading"><div class="spinner"></div>載入中...</div></div>
+  </div>
+
+  <!-- ── ALERT PANEL ── -->
+  <div id="alertPanel"></div>
+
+  <!-- ── CATALYST TIMELINE ── -->
+  <div class="catalyst-card" id="catalystCard"></div>
+
+  <div class="footer">
+    資料來源：<a href="https://finmindtrade.com" target="_blank">FinMind 開放資料</a> · 每日收盤後更新<br>
+    技術指標由本工具計算 · 本工具為輔助分析，不構成投資建議 · 投資有風險，請審慎評估
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════
+   股票核心設定：進場 / 停利 / 停損 / 警報條件
+   ═══════════════════════════════════════════════ */
+const STOCKS = {
+  '3711': {
+    name: '日月光投控',
+    entry: [305, 330],          // 建議進場區（下緣, 上緣）
+    tp1: 375,                   // 第一停利
+    tp2: 405,                   // 目標停利
+    sl: 275,                    // 停損線
+    breakout: 360,              // 帶量突破觸發追進
+    alerts: {
+      entryDesc: '估值最低（24x PE），CoWoS 超級週期核心受惠股，目前在季線回測進場區。',
+      breakoutDesc: '帶量突破 360 元前高壓力，確認多頭重啟，可加碼追進。',
+      slDesc: '跌破 275 元年線支撐，先進封裝成長預期遭下修，無條件出場。',
+      tp1Desc: '達 375 元前高壓力區，出 1/3 部位鎖定獲利，剩餘部位續抱。',
+      tp2Desc: '達 405 元外資目標價，再出 1/3，最後 1/3 移動停利至 5 日線。',
+    },
+    catalysts: [
+      { date: '2026/04（預估）', title: 'Q1 財報發布', desc: '法人預估 EPS 2.8–3.1 元，若優於預期可觸發突破 360 元前高。' },
+      { date: '2026 上半年', title: 'FOCoS 訂單落地', desc: 'AWS Trainium 3、AMD Venice CPU 自研 CoWoS 訂單確認，關鍵驗證里程碑。' },
+      { date: '2026 下半年', title: '月產能衝 2 萬片', desc: 'CoWoS 月產能目標從 9,000 片升至 20,000 片，若提前達標可帶動評價重估。' },
+    ]
+  },
+  '2308': {
+    name: '台達電',
+    entry: [1360, 1420],
+    tp1: 1550,
+    tp2: 1680,
+    sl: 1260,
+    breakout: 1480,
+    alerts: {
+      entryDesc: '2 月營收創同期新高，AI 電源 + 液冷雙主軸，季線回測進場。',
+      breakoutDesc: '帶量突破 1,480 元月線壓力，成交量放大 30% 以上，多頭確認。',
+      slDesc: '跌破 1,260 元年線，AI 資本支出週期擔憂升溫，無條件出場。',
+      tp1Desc: '達 1,550 元，出 1/3 部位，鎖定約 10% 報酬，剩餘續持。',
+      tp2Desc: '達 1,680 元外資目標上緣，再出 1/3，最後 1/3 移動停利。',
+    },
+    catalysts: [
+      { date: '2026/04/23', title: 'Q1 財報', desc: '法人預估 EPS 7.27 元。若優於預期，確認「逐季增」軌道，強力突破月線壓力。' },
+      { date: '2026/04', title: '美國德州廠啟動', desc: '22.6 萬平方英尺廠區正式啟用，規避關稅並拓展北美市場，長期競爭力加分。' },
+      { date: '2026 下半年', title: 'Rubin 800VDC 放量', desc: '輝達 Rubin Ultra 功耗 600kW，800V 高壓直流電源規格全面導入，台達電直接受惠。' },
+    ]
+  },
+  '3017': {
+    name: '奇鋐',
+    entry: [1860, 1980],
+    tp1: 2200,
+    tp2: 2400,
+    sl: 1650,
+    breakout: 2200,
+    alerts: {
+      entryDesc: '2025 全年 EPS 49.17 元創歷史新高，液冷散熱龍頭，法說後強勁反彈中，等待拉回進場。',
+      breakoutDesc: '帶量突破 2,200 元前高，ASIC 放量加速，確認多頭，追進目標看 2,300–2,500 元。',
+      slDesc: '跌破 1,650 元季線，液冷滲透率預期下修，停損出場。',
+      tp1Desc: '達 2,200 元前高壓力，出 1/3 部位鎖定約 15% 報酬。',
+      tp2Desc: '達 2,400 元外資目標上緣，再出 1/3，最後 1/3 跟 5 日線走。',
+    },
+    catalysts: [
+      { date: '2026/04', title: '越南三期廠開產', desc: '水冷板月產能開始從 20 萬組爬坡，是第一個可量化驗證的產能里程碑。' },
+      { date: '2026/05/13', title: 'Q1 財報', desc: '法人預估 EPS 18.76 元。若達標確認「逐季增」軌道，強力催化突破 2,200 元前高。' },
+      { date: '2026 下半年', title: 'ASIC 訂單全面放量', desc: '水冷板月產能衝 100 萬組目標，ASIC 占比超越 GPU，2026 全年 EPS 有望挑戰 90–100 元。' },
+    ]
+  }
+};
+
+const API = 'https://api.finmindtrade.com/api/v4/data';
+let token = '';
+let currentStock = '3711';
+let currentDays = 120;
+let priceChart = null;
+let allData = {};
+
+function applyToken() { token = document.getElementById('tokenInput').value.trim(); showErr(''); loadAll(); }
+
+function showErr(msg) {
+  const el = document.getElementById('errBox');
+  el.textContent = msg; el.style.display = msg ? 'block' : 'none';
+}
+
+async function fetchData(dataset, stockId, startDate) {
+  const params = new URLSearchParams({ dataset, data_id: stockId, start_date: startDate });
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  try {
+    const r = await fetch(`${API}?${params}`, { headers });
+    const j = await r.json();
+    if (j.msg && j.msg !== 'success') throw new Error(j.msg);
+    return j.data || [];
+  } catch(e) { console.error(e); return null; }
+}
+
+function getStartDate(days) {
+  const d = new Date(); d.setDate(d.getDate() - days - 30); return d.toISOString().slice(0,10);
+}
+
+function avg(arr) { return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0; }
+
+function calcMA(data, period) {
+  return data.map((_, i) => i < period-1 ? null : avg(data.slice(i-period+1, i+1)));
+}
+
+function calcRSI(closes, period=14) {
+  if (closes.length < period+1) return null;
+  let gA=0, lA=0;
+  for (let i=1; i<=period; i++) { const d=closes[i]-closes[i-1]; d>0?gA+=d:lA-=d; }
+  let avgG=gA/period, avgL=lA/period;
+  for (let i=period+1; i<closes.length; i++) {
+    const d=closes[i]-closes[i-1];
+    avgG=(avgG*(period-1)+Math.max(d,0))/period;
+    avgL=(avgL*(period-1)+Math.max(-d,0))/period;
+  }
+  return avgL===0?100:Math.round(100-100/(1+avgG/avgL));
+}
+
+function calcMACD(closes) {
+  const ema=(data,p)=>{ const k=2/(p+1); let e=data[0]; return data.map(v=>{e=v*k+e*(1-k);return e;}); };
+  const ema12=ema(closes,12), ema26=ema(closes,26);
+  const macd=ema12.map((v,i)=>v-ema26[i]);
+  const sig=ema(macd,9);
+  const hist=macd.map((v,i)=>v-sig[i]);
+  return hist[hist.length-1];
+}
+
+/* ─── 核心警報判斷邏輯 ─── */
+function evaluateSignal(sid, price, closes, chipData) {
+  const s = STOCKS[sid];
+  const rsi   = calcRSI(closes) || 50;
+  const ma5   = avg(closes.slice(-5));
+  const ma20  = avg(closes.slice(-20));
+  const ma60  = avg(closes.slice(-60));
+  const macd  = calcMACD(closes);
+  const vols  = closes.map((_,i)=>i); // placeholder — volume separately
+  const golden = ma5 > ma20;
+
+  // Chip: net buy/sell last 10 days
+  let chipNet = 0;
+  if (chipData && chipData.length) {
+    chipData.slice(-10).forEach(r => {
+      chipNet += ((r.Foreign_Investor_Buy||0)-(r.Foreign_Investor_Sell||0));
+    });
+  }
+  const chipBullish = chipNet > 0;
+
+  /* ── 五個警報條件 ── */
+  const conds = {
+    inEntry:    price >= s.entry[0] && price <= s.entry[1],
+    aboveSL:    price > s.sl,
+    goldenMA:   golden,
+    rsiBuy:     rsi >= 30 && rsi <= 60,
+    chipBuy:    chipBullish,
+    breakout:   price >= s.breakout,
+    hitTP1:     price >= s.tp1,
+    hitTP2:     price >= s.tp2,
+    hitSL:      price <= s.sl,
+    rsiHot:     rsi > 72,
+  };
+
+  let status, headline, body;
+
+  if (conds.hitSL) {
+    status = 'CAUTION';
+    headline = '停損警報：已跌破停損線';
+    body = `現價 ${price.toLocaleString()} 元已跌破停損線 ${s.sl.toLocaleString()} 元。${s.alerts.slDesc} 建議無條件出場，不戀戰。`;
+  } else if (conds.hitTP2) {
+    status = 'CAUTION';
+    headline = '停利警報：已達目標停利區';
+    body = `現價 ${price.toLocaleString()} 元已超過目標停利 ${s.tp2.toLocaleString()} 元。${s.alerts.tp2Desc} 若已持有，啟動移動停利機制，跌破 5 日線即出清。`;
+  } else if (conds.hitTP1 && !conds.hitTP2) {
+    status = 'HOLD';
+    headline = '持倉管理：已達第一停利點';
+    body = `現價 ${price.toLocaleString()} 元已達第一停利 ${s.tp1.toLocaleString()} 元。${s.alerts.tp1Desc} 目標停利 ${s.tp2.toLocaleString()} 元，停損上移至成本價。`;
+  } else if (conds.breakout && price > s.entry[1] && price < s.tp1) {
+    status = 'BUY';
+    headline = '突破訊號：帶量突破前高壓力';
+    body = `現價 ${price.toLocaleString()} 元突破關鍵壓力 ${s.breakout.toLocaleString()} 元。${s.alerts.breakoutDesc} 目標停利 ${s.tp2.toLocaleString()} 元，停損守 ${s.sl.toLocaleString()} 元。`;
+  } else if (conds.inEntry) {
+    const passCount = [conds.goldenMA, conds.rsiBuy, conds.chipBuy].filter(Boolean).length;
+    if (passCount >= 2) {
+      status = 'BUY';
+      headline = '進場訊號：現價在建議進場區，條件吻合';
+    } else {
+      status = 'WATCH';
+      headline = '觀察：現價在進場區，但條件未全滿足';
+    }
+    body = `現價 ${price.toLocaleString()} 元落在進場區 ${s.entry[0].toLocaleString()}–${s.entry[1].toLocaleString()} 元。${s.alerts.entryDesc} 第一停利 ${s.tp1.toLocaleString()}，目標停利 ${s.tp2.toLocaleString()}，停損 ${s.sl.toLocaleString()} 元。`;
+  } else if (price < s.entry[0]) {
+    status = 'WATCH';
+    headline = '觀察：低於進場區，等待反彈確認';
+    body = `現價 ${price.toLocaleString()} 元低於進場區下緣 ${s.entry[0].toLocaleString()} 元。等待止跌訊號（量縮帶長下影線）後再建倉。季線 ${Math.round(ma60).toLocaleString()} 元為關鍵支撐，若跌破停損線 ${s.sl.toLocaleString()} 元需重新評估。`;
+  } else {
+    status = 'WATCH';
+    headline = '觀察：現價高於進場區，等待回測';
+    body = `現價 ${price.toLocaleString()} 元高於進場區上緣 ${s.entry[1].toLocaleString()} 元。等待回測進場區或帶量突破 ${s.breakout.toLocaleString()} 元。季線 ${Math.round(ma60).toLocaleString()} 元為主要支撐。`;
+  }
+
+  return { status, headline, body, rsi, ma5, ma20, ma60, macd, golden, chipBullish, conds, price };
+}
+
+/* ─── 渲染警報面板 ─── */
+function renderAlertPanel(sid, sig) {
+  const s = STOCKS[sid];
+  const icons = { BUY:'▲', WATCH:'◎', CAUTION:'▼', HOLD:'●' };
+  const labels = { BUY:'進場訊號', WATCH:'觀察等待', CAUTION:'注意警示', HOLD:'持倉管理' };
+
+  const condItems = [
+    { label:'均線多頭排列', pass: sig.golden, val: sig.golden?'多頭':'空頭' },
+    { label:`RSI ${sig.rsi} 在 30–60`, pass: sig.rsi>=30 && sig.rsi<=60, val: sig.rsi },
+    { label:'外資近 10 日淨買超', pass: sig.chipBullish, val: sig.chipBullish?'買超':'賣超' },
+    { label:`現價 > 季線 ${Math.round(sig.ma60)}`, pass: sig.price > sig.ma60, val: (((sig.price-sig.ma60)/sig.ma60)*100).toFixed(1)+'%' },
+    { label:`MACD 柱狀 > 0`, pass: sig.macd > 0, val: sig.macd.toFixed(1) },
+    { label:`未觸及停損 ${s.sl.toLocaleString()}`, pass: sig.price > s.sl, val: sig.price > s.sl?'安全':'觸發' },
+  ];
+
+  document.getElementById('alertPanel').innerHTML = `
+    <div class="alert-panel ${sig.status}">
+      <div class="alert-head">
+        <div class="alert-icon">${icons[sig.status]}</div>
+        <div>
+          <div class="alert-title">${labels[sig.status]}：${sig.headline}</div>
+        </div>
+      </div>
+      <div class="alert-body">${sig.body}</div>
+      <div class="alert-conditions">
+        ${condItems.map(c=>`
+          <div class="cond-row">
+            <div class="cond-dot ${c.pass?'pass':'fail'}"></div>
+            <div class="cond-text">${c.label}</div>
+            <div class="cond-val">${c.val}</div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+/* ─── 渲染催化劑時程 ─── */
+function renderCatalyst(sid) {
+  const s = STOCKS[sid];
+  const items = s.catalysts.map(c=>`
+    <div class="cat-item">
+      <div class="cat-date">${c.date}</div>
+      <div class="cat-content">
+        <div class="cat-title">${c.title}</div>
+        <div class="cat-desc">${c.desc}</div>
+      </div>
+    </div>`).join('');
+  document.getElementById('catalystCard').innerHTML = `<h3>中線催化劑時程</h3>${items}`;
+}
+
+/* ─── 渲染總覽卡片 ─── */
+function renderOverviewCard(sid, price, chgPct, closes, chipData) {
+  const s = STOCKS[sid];
+  const sig = evaluateSignal(sid, price, closes, chipData);
+  const labels = { BUY:'進場訊號', WATCH:'觀察等待', CAUTION:'注意警示', HOLD:'持倉管理' };
+  const sign = chgPct >= 0 ? '+' : '';
+  const chgColor = chgPct > 0.05 ? 'var(--green)' : chgPct < -0.05 ? 'var(--red)' : 'var(--text2)';
+
+  document.getElementById(`ovp-${sid}`).textContent = price.toLocaleString();
+  document.getElementById(`ovp-${sid}`).style.color = chgColor;
+  document.getElementById(`ovc-${sid}`).textContent = `${sign}${chgPct.toFixed(2)}%`;
+  document.getElementById(`ovc-${sid}`).style.color = chgColor;
+  document.getElementById(`ova-${sid}`).innerHTML = `<span class="ov-alert ${sig.status}">${labels[sig.status]}</span>`;
+
+  // mini sparkline
+  const mini = closes.slice(-20);
+  const minV = Math.min(...mini), maxV = Math.max(...mini), rng = maxV - minV || 1;
+  const barEl = document.getElementById(`ovb-${sid}`);
+  barEl.innerHTML = mini.map((v,i)=>{
+    const h = Math.round(((v-minV)/rng)*24)+4;
+    const isLast = i===mini.length-1;
+    const col = isLast ? (chgPct>=0?'var(--green)':'var(--red)') : 'rgba(255,255,255,0.12)';
+    return `<div class="ov-bar" style="height:${h}px;background:${col}"></div>`;
+  }).join('');
+}
+
+async function loadAll() {
+  const btn = document.getElementById('refreshBtn');
+  btn.textContent = '載入中...'; btn.disabled = true; showErr('');
+
+  const startDate = getStartDate(365);
+  const chipStart = getStartDate(30);
+
+  let anyFail = false;
+  for (const sid of Object.keys(STOCKS)) {
+    const [price, chip] = await Promise.all([
+      fetchData('TaiwanStockPrice', sid, startDate),
+      fetchData('TaiwanStockInstitutionalInvestorsBuySell', sid, chipStart)
+    ]);
+    if (price === null) anyFail = true;
+    allData[sid] = { price: price || [], chip: chip || [] };
+
+    if (price && price.length > 0) {
+      const last = price[price.length-1];
+      const prev = price[price.length-2];
+      const chg = prev ? ((last.close-prev.close)/prev.close*100) : 0;
+      const closes20 = price.slice(-20).map(p=>p.close);
+      renderOverviewCard(sid, last.close, chg, price.slice(-120).map(p=>p.close), chip||[]);
+
+      const chgEl = document.getElementById(`chg-${sid}`);
+      chgEl.textContent = ` ${chg>=0?'+':''}${chg.toFixed(2)}%`;
+      chgEl.className = `chg ${chg>0.05?'chg-up':chg<-0.05?'chg-dn':'chg-neu'}`;
+    }
+  }
+
+  if (anyFail) showErr('部分資料載入失敗，可能已達免費額度上限（300次/小時）。請稍後再試或輸入 FinMind Token。');
+
+  btn.textContent = '重新載入'; btn.disabled = false;
+  const now = new Date();
+  document.getElementById('lastUpdate').textContent =
+    `更新於 ${now.toLocaleDateString('zh-TW')} ${now.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})}`;
+
+  renderStock(currentStock);
+}
+
+function selectStock(sid) {
+  currentStock = sid;
+  document.querySelectorAll('.ov-card').forEach(c => c.classList.remove('active'));
+  document.getElementById(`ov-${sid}`).classList.add('active');
+  renderStock(sid);
+}
+
+function setPeriod(days, btn) {
+  currentDays = days;
+  document.querySelectorAll('.pbtn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderStock(currentStock);
+}
+
+function renderStock(sid) {
+  const d = allData[sid];
+  if (!d || !d.price.length) { document.getElementById('m-close').textContent = '無資料'; return; }
+
+  const prices = d.price.slice(-currentDays);
+  const closes = prices.map(p => p.close);
+  const dates  = prices.map(p => p.date.slice(5));
+  const vols   = prices.map(p => Math.round(p.Trading_Volume/1000));
+
+  const last = prices[prices.length-1];
+  const prev = prices[prices.length-2];
+  const chgPct = prev ? ((last.close-prev.close)/prev.close*100) : 0;
+  const sign = chgPct >= 0 ? '+' : '';
+  const chgColor = chgPct>=0.05?'var(--green)':chgPct<-0.05?'var(--red)':'var(--text2)';
+
+  document.getElementById('m-close').textContent = last.close.toLocaleString();
+  document.getElementById('m-close').style.color = chgColor;
+  document.getElementById('m-chg').textContent = `${sign}${chgPct.toFixed(2)}% 較前日`;
+  document.getElementById('m-chg').style.color = chgColor;
+
+  const volK = Math.round(last.Trading_Volume/1000);
+  document.getElementById('m-vol').textContent = volK.toLocaleString()+' 張';
+  const vol5 = avg(vols.slice(-6,-1));
+  const volR = vol5>0?Math.round(volK/vol5*100):100;
+  document.getElementById('m-vol-sub').textContent = `5日均量比 ${volR}%`;
+  document.getElementById('m-vol-sub').style.color = volR>130?'var(--green)':volR<60?'var(--red)':'var(--text2)';
+
+  const allPrices = d.price.map(p=>p.close);
+  const hi52 = Math.max(...allPrices.slice(-252));
+  const lo52 = Math.min(...allPrices.slice(-252));
+  document.getElementById('m-range').textContent = `${hi52.toLocaleString()} / ${lo52.toLocaleString()}`;
+  document.getElementById('m-range-sub').textContent = `距年高 ${((last.close-hi52)/hi52*100).toFixed(1)}%`;
+
+  const ma60 = avg(closes.slice(-60));
+  const ma60Diff = ma60>0?((last.close-ma60)/ma60*100):0;
+  document.getElementById('m-ma60').textContent = `${ma60Diff>=0?'+':''}${ma60Diff.toFixed(1)}%`;
+  document.getElementById('m-ma60').style.color = ma60Diff>=0?'var(--green)':'var(--red)';
+  document.getElementById('m-ma60-sub').textContent = `季線 ${Math.round(ma60).toLocaleString()} 元`;
+
+  renderSLTP(sid, last.close);
+  drawChart(dates, closes, vols);
+  renderIndicators(closes, vols);
+  renderChip(d.chip);
+
+  // Evaluate & render signal
+  const sig = evaluateSignal(sid, last.close, closes, d.chip);
+  renderAlertPanel(sid, sig);
+  renderCatalyst(sid);
+}
+
+function renderSLTP(sid, price) {
+  const s = STOCKS[sid];
+  document.getElementById('sltpRow').innerHTML = `
+    <div class="sltp-pill entry"><div class="sltp-label">建議進場</div><div class="sltp-val">${s.entry[0].toLocaleString()}–${s.entry[1].toLocaleString()}</div></div>
+    <div class="sltp-pill tp1"><div class="sltp-label">第一停利</div><div class="sltp-val">${s.tp1.toLocaleString()}</div></div>
+    <div class="sltp-pill tp2"><div class="sltp-label">目標停利</div><div class="sltp-val">${s.tp2.toLocaleString()}</div></div>
+    <div class="sltp-pill sl"><div class="sltp-label">停損線</div><div class="sltp-val">${s.sl.toLocaleString()}</div></div>`;
+}
+
+function drawChart(dates, closes, vols) {
+  if (priceChart) { priceChart.destroy(); priceChart = null; }
+  const ma5  = calcMA(closes,5);
+  const ma20 = calcMA(closes,20);
+  const ma60 = calcMA(closes,60);
+  const skip = Math.ceil(dates.length/8);
+
+  priceChart = new Chart(document.getElementById('priceChart'), {
+    type:'bar',
+    data:{
+      labels:dates,
+      datasets:[
+        {type:'line',label:'收盤',data:closes,borderColor:'#60a5fa',borderWidth:1.5,pointRadius:0,tension:.3,yAxisID:'y',order:1},
+        {type:'line',label:'MA5', data:ma5,  borderColor:'#fbbf24',borderWidth:1,pointRadius:0,tension:.3,yAxisID:'y',order:2},
+        {type:'line',label:'MA20',data:ma20, borderColor:'#f87171',borderWidth:1,pointRadius:0,tension:.3,yAxisID:'y',order:3},
+        {type:'line',label:'MA60',data:ma60, borderColor:'#444441',borderWidth:1.5,pointRadius:0,tension:.3,yAxisID:'y',order:4,borderDash:[5,4]},
+        {type:'bar', label:'量',  data:vols, backgroundColor:'rgba(83,74,183,0.2)',yAxisID:'y2',order:5}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'rgba(23,23,26,0.95)',borderColor:'rgba(255,255,255,0.1)',borderWidth:.5,
+          titleColor:'#9c9a92',bodyColor:'#e8e6df',
+          callbacks:{label:ctx=>{
+            if(ctx.dataset.label==='量') return `成交量 ${Math.round(ctx.raw).toLocaleString()} 張`;
+            if(ctx.raw==null) return null;
+            return `${ctx.dataset.label}: ${ctx.raw.toFixed(1)}`;
+          }}
+        }
+      },
+      scales:{
+        x:{ticks:{color:'#5c5b56',font:{size:10},callback:(_,i)=>i%skip===0?dates[i]:'',maxRotation:0},grid:{color:'rgba(255,255,255,0.04)'}},
+        y:{position:'right',ticks:{color:'#5c5b56',font:{size:10},callback:v=>v.toLocaleString()},grid:{color:'rgba(255,255,255,0.04)'}},
+        y2:{position:'left',ticks:{color:'#5c5b56',font:{size:9},callback:v=>v>999?Math.round(v/1000)+'K':Math.round(v)},grid:{display:false},max:Math.max(...vols)*5}
+      }
+    }
+  });
+}
+
+function renderIndicators(closes, vols) {
+  const last = closes[closes.length-1];
+  const rsi = calcRSI(closes);
+  if (rsi!==null) {
+    const el=document.getElementById('i-rsi');
+    el.textContent=rsi; el.className=`ind-val ${rsi>70?'c-red':rsi<30?'c-green':'c-amber'}`;
+    const bar=document.getElementById('i-rsi-bar');
+    bar.style.width=rsi+'%'; bar.style.background=rsi>70?'#f87171':rsi<30?'#4ade80':'#fbbf24';
+  }
+  const ma5=avg(closes.slice(-5)), ma20=avg(closes.slice(-20));
+  const golden=ma5>ma20;
+  const maEl=document.getElementById('i-ma');
+  maEl.textContent=golden?'多頭排列':'空頭排列'; maEl.className=`ind-val ${golden?'c-green':'c-red'}`;
+  const maBar=document.getElementById('i-ma-bar');
+  maBar.style.width=golden?'80%':'20%'; maBar.style.background=golden?'#4ade80':'#f87171';
+
+  const histVal=calcMACD(closes);
+  const macdEl=document.getElementById('i-macd');
+  macdEl.textContent=histVal.toFixed(2); macdEl.className=`ind-val ${histVal>0?'c-green':'c-red'}`;
+  const p=Math.min(Math.abs(histVal)/(Math.abs(histVal)+0.5)*50+50,95);
+  const macdBar=document.getElementById('i-macd-bar');
+  macdBar.style.width=(histVal>0?p:100-p)+'%'; macdBar.style.background=histVal>0?'#4ade80':'#f87171';
+
+  const bias=((last-ma20)/ma20*100);
+  const biasEl=document.getElementById('i-bias');
+  biasEl.textContent=`${bias>=0?'+':''}${bias.toFixed(1)}%`;
+  biasEl.className=`ind-val ${Math.abs(bias)>10?'c-red':Math.abs(bias)<3?'c-green':'c-amber'}`;
+  const biasBar=document.getElementById('i-bias-bar');
+  biasBar.style.width=Math.max(Math.min(50+bias*2,95),5)+'%'; biasBar.style.background=Math.abs(bias)>10?'#f87171':'#fbbf24';
+
+  const lastVol=vols[vols.length-1], avgVol5=avg(vols.slice(-6,-1));
+  const volR=avgVol5>0?Math.round(lastVol/avgVol5*100):100;
+  const volEl=document.getElementById('i-vol');
+  volEl.textContent=volR+'%'; volEl.className=`ind-val ${volR>150?'c-green':volR<60?'c-amber':'c-blue'}`;
+  const volBar=document.getElementById('i-vol-bar');
+  volBar.style.width=Math.min(volR,100)+'%'; volBar.style.background=volR>150?'#4ade80':'#60a5fa';
+
+  const slice=closes.slice(-20), m=avg(slice);
+  const std=Math.sqrt(slice.reduce((s,v)=>{const d=v-m;return s+d*d},0)/slice.length);
+  const bollPct=Math.round((last-(m-2*std))/(4*std||1)*100);
+  const bollEl=document.getElementById('i-boll');
+  bollEl.textContent=bollPct+'%'; bollEl.className=`ind-val ${bollPct>80?'c-red':bollPct<20?'c-green':'c-amber'}`;
+  const bollBar=document.getElementById('i-boll-bar');
+  bollBar.style.width=Math.max(Math.min(bollPct,95),5)+'%'; bollBar.style.background=bollPct>80?'#f87171':bollPct<20?'#4ade80':'#fbbf24';
+}
+
+function renderChip(chipData) {
+  const el=document.getElementById('chipRows');
+  if (!chipData||!chipData.length) { el.innerHTML='<div style="font-size:12px;color:var(--text3)">法人資料無法取得</div>'; return; }
+  const types=['Foreign_Investor','Investment_Trust','Dealer'];
+  const nameMap={Foreign_Investor:'外資',Investment_Trust:'投信',Dealer:'自營商'};
+  const totals={};
+  types.forEach(t=>totals[t]=0);
+  chipData.slice(-10).forEach(r=>{ types.forEach(t=>{ totals[t]+=((r[`${t}_Buy`]||0)-(r[`${t}_Sell`]||0)); }); });
+  const maxAbs=Math.max(...types.map(t=>Math.abs(totals[t])),1);
+  el.innerHTML=types.map(t=>{
+    const v=Math.round(totals[t]/1000), pct=Math.abs(totals[t])/maxAbs*70, pos=v>=0;
+    return `<div class="chip-row">
+      <div class="chip-name">${nameMap[t]}</div>
+      <div class="chip-bar-bg"><div class="chip-bar-fill" style="width:${pct}%;background:${pos?'#4ade80':'#f87171'}"></div></div>
+      <div class="chip-val" style="color:${pos?'var(--green)':'var(--red)'}">${pos?'+':''}${v.toLocaleString()} 張</div>
+    </div>`;
+  }).join('')+`<div class="chip-note">近 10 個交易日累計</div>`;
+}
+
+loadAll();
+</script>
+</body>
+</html>
