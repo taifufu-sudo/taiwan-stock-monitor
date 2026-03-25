@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>台股每日選股雷達</title>
+<style>
+  :root {
+    --bg: #0f0f11; --bg2: #17171a; --bg3: #1e1e22;
+    --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.14);
+    --text: #e8e6df; --text2: #9c9a92; --text3: #5c5b56;
+    --green: #4ade80; --green-bg: rgba(74,222,128,0.1); --green-border: rgba(74,222,128,0.3);
+    --red: #f87171; --red-bg: rgba(248,113,113,0.1); --red-border: rgba(248,113,113,0.3);
+    --amber: #fbbf24; --amber-bg: rgba(251,191,36,0.08); --amber-border: rgba(251,191,36,0.3);
+    --blue: #60a5fa; --blue-bg: rgba(96,165,250,0.1);
+    --purple: #a78bfa; --accent: #534AB7;
+    --radius: 10px; --radius-sm: 6px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue','PingFang TC','Microsoft JhengHei',sans-serif; font-size: 14px; line-height: 1.5; min-height: 100vh; }
+  .app { max-width: 960px; margin: 0 auto; padding: 24px 16px 60px; }
+
+  /* Header */
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+  .header-left h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.3px; }
+  .header-left p { font-size: 12px; color: var(--text2); margin-top: 4px; }
+  .header-right { display: flex; gap: 8px; align-items: center; }
+  .nav-link { font-size: 12px; color: var(--blue); text-decoration: none; background: var(--blue-bg); border: 0.5px solid rgba(96,165,250,.3); border-radius: 20px; padding: 5px 12px; transition: opacity .15s; }
+  .nav-link:hover { opacity: .8; }
+
+  /* Token bar */
+  .token-bar { display: flex; gap: 8px; align-items: center; background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 8px; flex-wrap: wrap; }
+  .token-bar label { font-size: 12px; color: var(--text2); white-space: nowrap; }
+  .token-bar input[type=password] { flex: 1; min-width: 120px; background: var(--bg3); border: 0.5px solid var(--border2); border-radius: var(--radius-sm); color: var(--text); font-size: 12px; padding: 6px 10px; outline: none; }
+  .token-bar input:focus { border-color: var(--accent); }
+  .token-note { font-size: 11px; color: var(--text3); margin-bottom: 16px; }
+  .token-note a { color: var(--blue); text-decoration: none; }
+
+  /* Buttons */
+  button { cursor: pointer; border: 0.5px solid var(--border2); border-radius: var(--radius-sm); background: var(--bg2); color: var(--text2); font-size: 12px; padding: 7px 14px; transition: all 0.15s; font-family: inherit; }
+  button:hover { background: var(--bg3); color: var(--text); }
+  button.primary { background: var(--accent); color: #fff; border-color: transparent; }
+  button.primary:hover { opacity: 0.85; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Filter bar */
+  .filter-bar { display: flex; gap: 12px; align-items: center; background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 16px; flex-wrap: wrap; }
+  .filter-group { display: flex; align-items: center; gap: 4px; }
+  .filter-group label { font-size: 11px; color: var(--text3); white-space: nowrap; }
+  .filter-group input[type=number] { width: 70px; background: var(--bg3); border: 0.5px solid var(--border2); border-radius: var(--radius-sm); color: var(--text); font-size: 12px; padding: 4px 8px; outline: none; text-align: right; }
+  .filter-group select { background: var(--bg3); border: 0.5px solid var(--border2); border-radius: var(--radius-sm); color: var(--text); font-size: 12px; padding: 4px 8px; outline: none; }
+
+  /* Progress */
+  .progress-wrap { background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 12px 16px; margin-bottom: 16px; display: none; }
+  .progress-wrap.show { display: block; }
+  .progress-label { font-size: 12px; color: var(--text2); margin-bottom: 6px; }
+  .progress-bar { height: 6px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width .3s; width: 0%; }
+
+  /* Error */
+  .err { background: var(--red-bg); border: 0.5px solid var(--red-border); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 12px; color: var(--red); margin-bottom: 12px; display: none; }
+
+  /* Summary */
+  .summary { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 20px; display: none; }
+  .summary.show { display: grid; }
+  .sm { background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 12px 14px; text-align: center; }
+  .sm-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px; }
+  .sm-val { font-size: 22px; font-weight: 600; letter-spacing: -.5px; }
+  @media(max-width:600px){ .summary { grid-template-columns: repeat(2,1fr); } }
+
+  /* Candidate cards */
+  .candidates { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
+  .cand-card { background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 16px; transition: border-color .15s; }
+  .cand-card:hover { border-color: var(--border2); }
+  .cand-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .cand-rank { font-size: 13px; font-weight: 700; color: var(--accent); margin-right: 8px; }
+  .cand-name { font-size: 15px; font-weight: 600; }
+  .cand-code { font-size: 12px; color: var(--text3); margin-left: 6px; }
+  .cand-score-badge { font-size: 18px; font-weight: 700; padding: 4px 14px; border-radius: 20px; border: 0.5px solid; }
+  .cand-score-badge.high { background: var(--green-bg); border-color: var(--green-border); color: var(--green); }
+  .cand-score-badge.mid { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .cand-score-badge.low { background: var(--red-bg); border-color: var(--red-border); color: var(--red); }
+  .cand-meta { display: flex; gap: 16px; font-size: 12px; color: var(--text2); margin-bottom: 12px; flex-wrap: wrap; }
+  .cand-meta .chg-up { color: var(--green); } .cand-meta .chg-dn { color: var(--red); }
+
+  /* Score bars */
+  .score-bars { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 10px; }
+  @media(max-width:500px){ .score-bars { grid-template-columns: 1fr; } }
+  .sbar { }
+  .sbar-head { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 3px; }
+  .sbar-label { color: var(--text3); }
+  .sbar-val { font-weight: 600; }
+  .sbar-track { height: 5px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
+  .sbar-fill { height: 100%; border-radius: 3px; transition: width .4s; }
+  .sbar-fill.tech { background: var(--blue); }
+  .sbar-fill.inst { background: var(--purple); }
+  .sbar-fill.fund { background: var(--amber); }
+
+  /* Tags */
+  .cand-tags { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 10px; }
+  .tag { font-size: 10px; padding: 2px 8px; border-radius: 10px; border: 0.5px solid; }
+  .tag.green { background: var(--green-bg); border-color: var(--green-border); color: var(--green); }
+  .tag.amber { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.blue { background: var(--blue-bg); border-color: rgba(96,165,250,.3); color: var(--blue); }
+
+  .cand-action { text-align: right; }
+  .cand-action a { font-size: 12px; color: var(--blue); text-decoration: none; }
+  .cand-action a:hover { text-decoration: underline; }
+
+  /* Full table */
+  .table-section { margin-top: 16px; }
+  .table-toggle { margin-bottom: 10px; }
+  .full-table { width: 100%; border-collapse: collapse; font-size: 12px; display: none; }
+  .full-table.show { display: table; }
+  .full-table th { text-align: left; padding: 8px 10px; color: var(--text3); font-weight: 500; text-transform: uppercase; letter-spacing: .05em; font-size: 10px; border-bottom: 0.5px solid var(--border2); cursor: pointer; user-select: none; white-space: nowrap; }
+  .full-table th:hover { color: var(--text); }
+  .full-table th .sort-arrow { margin-left: 3px; font-size: 9px; }
+  .full-table td { padding: 7px 10px; border-bottom: 0.5px solid var(--border); white-space: nowrap; }
+  .full-table tr:hover td { background: var(--bg3); }
+  .full-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* Empty state */
+  .empty { text-align: center; padding: 60px 20px; color: var(--text3); }
+  .empty h3 { font-size: 16px; color: var(--text2); margin-bottom: 8px; }
+
+  /* Footer */
+  .footer { text-align: center; font-size: 11px; color: var(--text3); padding-top: 20px; border-top: 0.5px solid var(--border); margin-top: 40px; }
+  .footer a { color: var(--blue); text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <h1>台股每日選股雷達</h1>
+      <p>Phase 1 自動篩選 · 基本面 + 技術面 + 籌碼面</p>
+    </div>
+    <div class="header-right">
+      <a class="nav-link" href="index.html">核心持股看板 &rarr;</a>
+    </div>
+  </div>
+
+  <!-- Token -->
+  <div class="token-bar">
+    <label>FinMind Token</label>
+    <input type="password" id="tokenInput" placeholder="貼上 token（可選，提升速率）">
+    <button class="primary" id="btnScan" onclick="startScan()">開始篩選</button>
+    <button onclick="clearCache()">清除快取</button>
+  </div>
+  <div class="token-note">免費註冊 <a href="https://finmindtrade.com/" target="_blank">finmindtrade.com</a> 取得 token，速率 300→600 次/時。不輸入也可使用。</div>
+
+  <!-- Filters -->
+  <div class="filter-bar">
+    <div class="filter-group">
+      <label>最低股價</label>
+      <input type="number" id="fMinPrice" value="10" min="0">
+    </div>
+    <div class="filter-group">
+      <label>最低成交量(張)</label>
+      <input type="number" id="fMinVol" value="500" min="0">
+    </div>
+    <div class="filter-group">
+      <label>漲跌幅</label>
+      <select id="fChgRange">
+        <option value="all">不限</option>
+        <option value="normal" selected>-3%~+7%</option>
+        <option value="positive">僅漲</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>法人</label>
+      <select id="fInst">
+        <option value="netbuy" selected>外資+投信買超</option>
+        <option value="any">不限</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Error -->
+  <div class="err" id="errBox"></div>
+
+  <!-- Progress -->
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-label" id="progressLabel">準備中...</div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary" id="summaryPanel">
+    <div class="sm"><div class="sm-label">總掃描</div><div class="sm-val" id="smTotal">0</div></div>
+    <div class="sm"><div class="sm-label">通過初篩</div><div class="sm-val" id="smPassed">0</div></div>
+    <div class="sm"><div class="sm-label">候選標的</div><div class="sm-val" style="color:var(--green)" id="smCandidates">0</div></div>
+    <div class="sm"><div class="sm-label">平均分數</div><div class="sm-val" id="smAvgScore">--</div></div>
+  </div>
+
+  <!-- Candidates -->
+  <div id="candidatesWrap"></div>
+
+  <!-- Table -->
+  <div class="table-section" id="tableSection" style="display:none">
+    <div class="table-toggle">
+      <button onclick="toggleTable()">展開完整候選表格</button>
+    </div>
+    <table class="full-table" id="fullTable">
+      <thead>
+        <tr>
+          <th onclick="sortTable('rank')">排名 <span class="sort-arrow"></span></th>
+          <th onclick="sortTable('code')">代碼</th>
+          <th onclick="sortTable('name')">名稱</th>
+          <th onclick="sortTable('close')">收盤 <span class="sort-arrow"></span></th>
+          <th onclick="sortTable('chg')">漲跌% <span class="sort-arrow"></span></th>
+          <th onclick="sortTable('score')">總分 <span class="sort-arrow"></span></th>
+          <th onclick="sortTable('tech')">技術 <span class="sort-arrow"></span></th>
+          <th onclick="sortTable('inst')">籌碼 <span class="sort-arrow"></span></th>
+          <th onclick="sortTable('fund')">基本 <span class="sort-arrow"></span></th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+  <!-- Empty state -->
+  <div class="empty" id="emptyState">
+    <h3>準備就緒</h3>
+    <p>點擊「開始篩選」掃描全市場，找出符合條件的候選股票</p>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <p>資料來源：FinMind API · TWSE 證交所 | <a href="index.html">核心持股看板</a></p>
+  </div>
+</div>
+
+<script>
+/* ─── CONFIG ─── */
+const API = 'https://api.finmindtrade.com/api/v4/data';
+const CORS_PROXIES = [
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+];
+const WEIGHTS = { tech: 0.40, inst: 0.35, fund: 0.25 };
+const TOP_N = 10;
+const BATCH_SIZE = 6;
+const BATCH_DELAY = 800;
+
+let token = '';
+let scanning = false;
+let allResults = [];
+let currentSort = { key: 'score', asc: false };
+
+/* ─── HELPERS ─── */
+function avg(arr) { return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0; }
+
+function today() {
+  const d = new Date();
+  return d.toISOString().slice(0,10);
+}
+
+function startDateFor(days) {
+  const d = new Date();
+  d.setDate(d.getDate() - days - 10);
+  return d.toISOString().slice(0,10);
+}
+
+function showErr(msg) {
+  const el = document.getElementById('errBox');
+  el.textContent = msg; el.style.display = msg ? 'block' : 'none';
+}
+
+function setProgress(label, pct) {
+  const wrap = document.getElementById('progressWrap');
+  wrap.classList.add('show');
+  document.getElementById('progressLabel').textContent = label;
+  document.getElementById('progressFill').style.width = Math.min(100, pct) + '%';
+}
+
+function hideProgress() {
+  document.getElementById('progressWrap').classList.remove('show');
+}
+
+/* ─── CACHE ─── */
+function cacheKey(name) { return `screener_${name}_${today()}`; }
+
+function getCache(name) {
+  try {
+    const raw = localStorage.getItem(cacheKey(name));
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
+}
+
+function setCache(name, data) {
+  try { localStorage.setItem(cacheKey(name), JSON.stringify(data)); } catch {}
+}
+
+function clearCache() {
+  const keys = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith('screener_')) keys.push(k);
+  }
+  keys.forEach(k => localStorage.removeItem(k));
+  showErr('');
+  document.getElementById('candidatesWrap').innerHTML = '';
+  document.getElementById('tableSection').style.display = 'none';
+  document.getElementById('summaryPanel').classList.remove('show');
+  document.getElementById('emptyState').style.display = '';
+  allResults = [];
+}
+
+/* ─── API FETCH ─── */
+async function fetchFinMind(dataset, params = {}) {
+  const p = new URLSearchParams({ dataset, ...params });
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  const r = await fetch(`${API}?${p}`, { headers });
+  const j = await r.json();
+  if (j.msg && j.msg !== 'success') throw new Error(j.msg);
+  return j.data || [];
+}
+
+async function fetchWithCORS(url) {
+  // Try direct first
+  try {
+    const r = await fetch(url);
+    if (r.ok) return r;
+  } catch {}
+  // Try CORS proxies
+  for (const proxy of CORS_PROXIES) {
+    try {
+      const r = await fetch(proxy(url));
+      if (r.ok) return r;
+    } catch { continue; }
+  }
+  throw new Error('無法取得資料，CORS proxy 皆失敗');
+}
+
+/* ─── TECHNICAL INDICATORS ─── */
+function calcMA(data, period) {
+  return data.map((_, i) => i < period-1 ? null : avg(data.slice(i-period+1, i+1)));
+}
+
+function calcRSI(closes, period=14) {
+  if (closes.length < period+1) return null;
+  let gA=0, lA=0;
+  for (let i=1; i<=period; i++) { const d=closes[i]-closes[i-1]; d>0?gA+=d:lA-=d; }
+  let avgG=gA/period, avgL=lA/period;
+  for (let i=period+1; i<closes.length; i++) {
+    const d=closes[i]-closes[i-1];
+    avgG=(avgG*(period-1)+Math.max(d,0))/period;
+    avgL=(avgL*(period-1)+Math.max(-d,0))/period;
+  }
+  return avgL===0 ? 100 : Math.round(100 - 100/(1+avgG/avgL));
+}
+
+function calcMACD(closes) {
+  const ema = (data,p) => { const k=2/(p+1); let e=data[0]; return data.map(v => { e = v*k + e*(1-k); return e; }); };
+  const ema12 = ema(closes,12), ema26 = ema(closes,26);
+  const macd = ema12.map((v,i) => v - ema26[i]);
+  const sig = ema(macd, 9);
+  const hist = macd.map((v,i) => v - sig[i]);
+  return { last: hist[hist.length-1], prev: hist.length >= 2 ? hist[hist.length-2] : 0 };
+}
+
+/* ─── SCORING ENGINE ─── */
+function scoreTechnical(closes, volumes) {
+  if (!closes || closes.length < 60) return { score: 0, details: {} };
+  const price = closes[closes.length-1];
+  const ma5 = avg(closes.slice(-5));
+  const ma20 = avg(closes.slice(-20));
+  const ma60 = avg(closes.slice(-60));
+  const rsi = calcRSI(closes) || 50;
+  const macd = calcMACD(closes);
+  const volNow = volumes && volumes.length ? volumes[volumes.length-1] : 0;
+  const vol5 = volumes && volumes.length >= 5 ? avg(volumes.slice(-5)) : volNow;
+  const volRatio = vol5 > 0 ? volNow / vol5 : 1;
+
+  let s = 0;
+  // MA alignment (0-30)
+  if (price > ma5 && ma5 > ma20 && ma20 > ma60) s += 30;
+  else if (price > ma5 && ma5 > ma20) s += 22;
+  else if (price > ma20) s += 14;
+  else if (price > ma60) s += 7;
+
+  // RSI (0-25)
+  if (rsi >= 40 && rsi <= 60) s += 25;
+  else if (rsi >= 30 && rsi < 40) s += 18;
+  else if (rsi > 60 && rsi <= 70) s += 15;
+  else if (rsi > 70 && rsi <= 80) s += 5;
+  // <30 or >80 = 0
+
+  // MACD histogram (0-25)
+  if (macd.last > 0 && macd.last > macd.prev) s += 25;
+  else if (macd.last > 0) s += 15;
+  else if (macd.last < 0 && macd.last > macd.prev) s += 8;
+
+  // Volume ratio (0-20)
+  if (volRatio >= 1.2 && volRatio <= 2.0) s += 20;
+  else if (volRatio >= 1.0 && volRatio < 1.2) s += 12;
+  else if (volRatio >= 0.8 && volRatio < 1.0) s += 6;
+
+  return {
+    score: s,
+    details: { ma5: Math.round(ma5), ma20: Math.round(ma20), ma60: Math.round(ma60), rsi, macdHist: macd.last.toFixed(2), volRatio: (volRatio*100).toFixed(0)+'%' }
+  };
+}
+
+function scoreInstitutional(instData) {
+  if (!instData) return { score: 0, details: {} };
+  let foreignNet = 0, trustNet = 0, dealerNet = 0;
+  // instData may be an array of daily records; sum last few days
+  const rows = Array.isArray(instData) ? instData : [instData];
+  rows.forEach(r => {
+    foreignNet += (r.Foreign_Investor_Buy||0) - (r.Foreign_Investor_Sell||0);
+    trustNet += (r.Investment_Trust_Buy||0) - (r.Investment_Trust_Sell||0);
+    dealerNet += (r.Dealer_Buy||0) - (r.Dealer_Sell||0);
+  });
+
+  let s = 0;
+  // Foreign (0-40)
+  if (foreignNet > 500) s += 40;
+  else if (foreignNet > 100) s += 30;
+  else if (foreignNet > 0) s += 18;
+  else if (foreignNet > -200) s += 5;
+
+  // Trust (0-35)
+  if (trustNet > 100) s += 35;
+  else if (trustNet > 20) s += 25;
+  else if (trustNet > 0) s += 15;
+  else if (trustNet > -50) s += 5;
+
+  // Alignment (0-25)
+  const dirs = [foreignNet > 0, trustNet > 0, dealerNet > 0];
+  const buyCount = dirs.filter(Boolean).length;
+  if (buyCount === 3) s += 25;
+  else if (buyCount === 2) s += 15;
+  else if (buyCount === 1) s += 5;
+
+  return {
+    score: s,
+    details: { foreignNet, trustNet, dealerNet }
+  };
+}
+
+function scoreFundamental(revData) {
+  if (!revData || !revData.length) return { score: 0, details: {} };
+  // revData should contain revenue entries; find latest and compare
+  const sorted = [...revData].sort((a,b) => (a.date||'').localeCompare(b.date||''));
+  const latest = sorted[sorted.length - 1];
+  const yoy = latest.revenue_year_over_year || 0;
+  const mom = latest.revenue_month_over_month || 0;
+
+  let s = 0;
+  // YoY (0-60)
+  if (yoy > 30) s += 60;
+  else if (yoy > 10) s += 45;
+  else if (yoy > 0) s += 30;
+  else if (yoy > -5) s += 15;
+
+  // MoM (0-40)
+  if (mom > 10) s += 40;
+  else if (mom > 5) s += 30;
+  else if (mom > 0) s += 20;
+  else if (mom > -5) s += 10;
+
+  return {
+    score: s,
+    details: { yoy: yoy.toFixed(1)+'%', mom: mom.toFixed(1)+'%', revenue: latest.revenue }
+  };
+}
+
+function compositeScore(tech, inst, fund) {
+  return Math.round(tech * WEIGHTS.tech + inst * WEIGHTS.inst + fund * WEIGHTS.fund);
+}
+
+/* ─── MAIN SCAN FLOW ─── */
+async function startScan() {
+  if (scanning) return;
+  scanning = true;
+  token = document.getElementById('tokenInput').value.trim();
+  showErr('');
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('candidatesWrap').innerHTML = '';
+  document.getElementById('tableSection').style.display = 'none';
+  document.getElementById('summaryPanel').classList.remove('show');
+  document.getElementById('btnScan').disabled = true;
+  allResults = [];
+
+  try {
+    /* ── Phase A: Bulk fetch ── */
+    setProgress('Phase A: 取得全市場每日收盤資料 (1/3)...', 5);
+    const priceData = await fetchBulkPrices();
+    if (!priceData || !priceData.length) throw new Error('無法取得股價資料。請確認 FinMind token 或稍後重試。');
+
+    setProgress('Phase A: 取得法人進出資料 (2/3)...', 20);
+    const instData = await fetchBulkInstitutional();
+
+    setProgress('Phase A: 取得月營收資料 (3/3)...', 35);
+    const revData = await fetchBulkRevenue();
+
+    /* ── Pre-filter ── */
+    setProgress('Phase A: 初篩中...', 45);
+    const minPrice = parseFloat(document.getElementById('fMinPrice').value) || 10;
+    const minVol = parseFloat(document.getElementById('fMinVol').value) || 500;
+    const chgRange = document.getElementById('fChgRange').value;
+    const instFilter = document.getElementById('fInst').value;
+
+    // Group by stock
+    const stockMap = groupByStock(priceData);
+    const instMap = groupByStock(instData || []);
+    const revMap = groupByStock(revData || []);
+    const totalStocks = Object.keys(stockMap).length;
+
+    // Pre-filter
+    const candidates = [];
+    for (const [sid, rows] of Object.entries(stockMap)) {
+      const last = rows[rows.length - 1];
+      if (!last) continue;
+      const close = last.close;
+      const vol = (last.Trading_Volume || 0) / 1000; // shares to lots (千股→張)
+      const open = last.open;
+      const chg = open > 0 ? ((close - open) / open * 100) : 0;
+
+      // Price filter
+      if (close < minPrice) continue;
+      // Volume filter
+      if (vol < minVol) continue;
+      // Change range filter
+      if (chgRange === 'normal' && (chg < -3 || chg > 7)) continue;
+      if (chgRange === 'positive' && chg < 0) continue;
+
+      // Institutional filter
+      if (instFilter === 'netbuy' && instMap[sid]) {
+        const ir = instMap[sid];
+        const fNet = ir.reduce((a,r) => a + (r.Foreign_Investor_Buy||0) - (r.Foreign_Investor_Sell||0), 0);
+        const tNet = ir.reduce((a,r) => a + (r.Investment_Trust_Buy||0) - (r.Investment_Trust_Sell||0), 0);
+        if (fNet + tNet <= 0) continue;
+      }
+
+      candidates.push({
+        code: sid,
+        name: last.stock_name || sid,
+        close, vol, chg,
+        date: last.date,
+        instRows: instMap[sid] || [],
+        revRows: revMap[sid] || [],
+      });
+    }
+
+    setProgress(`Phase A 完成：${totalStocks} 檔掃描，${candidates.length} 檔通過初篩`, 50);
+
+    /* ── Phase B: Deep analysis ── */
+    const scored = [];
+    for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
+      const batch = candidates.slice(i, i + BATCH_SIZE);
+      const pct = 50 + (i / candidates.length) * 45;
+      setProgress(`Phase B: 深度分析 ${Math.min(i+BATCH_SIZE, candidates.length)}/${candidates.length} 檔...`, pct);
+
+      const results = await Promise.all(batch.map(async (c) => {
+        try {
+          // Check cache for historical data
+          const cacheId = `hist_${c.code}`;
+          let hist = getCache(cacheId);
+          if (!hist) {
+            hist = await fetchFinMind('TaiwanStockPrice', { data_id: c.code, start_date: startDateFor(150) });
+            if (hist && hist.length) setCache(cacheId, hist);
+          }
+          if (!hist || hist.length < 30) return null;
+
+          const closes = hist.map(r => r.close);
+          const volumes = hist.map(r => (r.Trading_Volume || 0) / 1000);
+
+          const tech = scoreTechnical(closes, volumes);
+          const inst = scoreInstitutional(c.instRows);
+          const fund = scoreFundamental(c.revRows);
+          const total = compositeScore(tech.score, inst.score, fund.score);
+
+          return {
+            code: c.code,
+            name: c.name,
+            close: c.close,
+            vol: c.vol,
+            chg: c.chg,
+            date: c.date,
+            totalScore: total,
+            techScore: tech.score,
+            instScore: inst.score,
+            fundScore: fund.score,
+            techDetails: tech.details,
+            instDetails: inst.details,
+            fundDetails: fund.details,
+          };
+        } catch { return null; }
+      }));
+
+      scored.push(...results.filter(Boolean));
+
+      if (i + BATCH_SIZE < candidates.length) {
+        await new Promise(r => setTimeout(r, BATCH_DELAY));
+      }
+    }
+
+    // Sort by score
+    scored.sort((a,b) => b.totalScore - a.totalScore);
+    allResults = scored;
+
+    /* ── Render ── */
+    setProgress('完成！正在渲染結果...', 98);
+    renderResults(totalStocks, candidates.length, scored);
+    hideProgress();
+
+  } catch(e) {
+    showErr(e.message || '篩選過程發生錯誤');
+    hideProgress();
+    console.error(e);
+  } finally {
+    scanning = false;
+    document.getElementById('btnScan').disabled = false;
+  }
+}
+
+/* ─── DATA FETCHING ─── */
+async function fetchBulkPrices() {
+  const cached = getCache('bulkPrice');
+  if (cached) return cached;
+
+  // FinMind: TaiwanStockPrice for recent days (no data_id = all stocks)
+  // We need a few days for calculating daily change
+  const start = startDateFor(5);
+  try {
+    const data = await fetchFinMind('TaiwanStockPrice', { start_date: start });
+    if (data && data.length) { setCache('bulkPrice', data); return data; }
+  } catch(e) { console.warn('FinMind bulk price failed:', e); }
+
+  // Fallback: TWSE MI_INDEX
+  try {
+    const d = new Date();
+    const dateStr = d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
+    const url = `https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&type=ALLBUT0999&date=${dateStr}`;
+    const resp = await fetchWithCORS(url);
+    const j = await resp.json();
+    if (j.data9) {
+      const parsed = parseTWSEMI(j);
+      if (parsed.length) { setCache('bulkPrice', parsed); return parsed; }
+    }
+  } catch(e) { console.warn('TWSE MI_INDEX fallback failed:', e); }
+
+  return null;
+}
+
+async function fetchBulkInstitutional() {
+  const cached = getCache('bulkInst');
+  if (cached) return cached;
+
+  const start = startDateFor(10);
+  try {
+    const data = await fetchFinMind('TaiwanStockInstitutionalInvestorsBuySell', { start_date: start });
+    if (data && data.length) { setCache('bulkInst', data); return data; }
+  } catch(e) { console.warn('FinMind bulk institutional failed:', e); }
+
+  return [];
+}
+
+async function fetchBulkRevenue() {
+  const cached = getCache('bulkRev');
+  if (cached) return cached;
+
+  // Get last 2 months of revenue
+  const d = new Date();
+  d.setMonth(d.getMonth() - 2);
+  const start = d.toISOString().slice(0,10);
+  try {
+    const data = await fetchFinMind('TaiwanStockMonthRevenue', { start_date: start });
+    if (data && data.length) { setCache('bulkRev', data); return data; }
+  } catch(e) { console.warn('FinMind bulk revenue failed:', e); }
+
+  return [];
+}
+
+/* ─── PARSERS ─── */
+function groupByStock(data) {
+  const map = {};
+  data.forEach(r => {
+    const sid = r.stock_id || r.data_id;
+    if (!sid) return;
+    if (!map[sid]) map[sid] = [];
+    map[sid].push(r);
+  });
+  return map;
+}
+
+function parseTWSEMI(json) {
+  // MI_INDEX data9 contains individual stock data
+  if (!json.data9) return [];
+  const fields = json.fields9 || [];
+  const codeIdx = fields.indexOf('證券代號');
+  const nameIdx = fields.indexOf('證券名稱');
+  const volIdx = fields.indexOf('成交股數');
+  const openIdx = fields.indexOf('開盤價');
+  const highIdx = fields.indexOf('最高價');
+  const lowIdx = fields.indexOf('最低價');
+  const closeIdx = fields.indexOf('收盤價');
+
+  return json.data9.map(row => {
+    const code = row[codeIdx] || '';
+    // Only process numeric stock codes (skip warrants etc)
+    if (!/^\d{4,6}$/.test(code)) return null;
+    return {
+      stock_id: code,
+      stock_name: row[nameIdx] || '',
+      date: today(),
+      open: parseFloat((row[openIdx]||'0').replace(/,/g,'')),
+      close: parseFloat((row[closeIdx]||'0').replace(/,/g,'')),
+      max: parseFloat((row[highIdx]||'0').replace(/,/g,'')),
+      min: parseFloat((row[lowIdx]||'0').replace(/,/g,'')),
+      Trading_Volume: parseInt((row[volIdx]||'0').replace(/,/g,''), 10),
+    };
+  }).filter(Boolean);
+}
+
+/* ─── RENDERING ─── */
+function renderResults(totalScanned, passedFilter, scored) {
+  // Summary
+  const top = scored.slice(0, TOP_N);
+  const avgScore = scored.length ? (scored.reduce((a,s)=>a+s.totalScore,0)/scored.length).toFixed(1) : '--';
+  document.getElementById('smTotal').textContent = totalScanned.toLocaleString();
+  document.getElementById('smPassed').textContent = passedFilter.toLocaleString();
+  document.getElementById('smCandidates').textContent = top.length;
+  document.getElementById('smAvgScore').textContent = avgScore;
+  document.getElementById('summaryPanel').classList.add('show');
+
+  // Cards
+  const wrap = document.getElementById('candidatesWrap');
+  if (!top.length) {
+    wrap.innerHTML = '<div class="empty"><h3>今日無符合條件的候選標的</h3><p>嘗試調整篩選條件後重新掃描</p></div>';
+    return;
+  }
+  wrap.innerHTML = '<div class="candidates">' + top.map((s, i) => renderCard(s, i+1)).join('') + '</div>';
+
+  // Table
+  document.getElementById('tableSection').style.display = '';
+  renderTable(scored);
+}
+
+function renderCard(s, rank) {
+  const badgeClass = s.totalScore >= 75 ? 'high' : s.totalScore >= 50 ? 'mid' : 'low';
+  const chgClass = s.chg >= 0 ? 'chg-up' : 'chg-dn';
+  const chgStr = (s.chg >= 0 ? '+' : '') + s.chg.toFixed(2) + '%';
+
+  const tags = [];
+  if (s.instDetails.foreignNet > 0) tags.push({ text: `外資買超 ${Math.round(s.instDetails.foreignNet)}張`, cls: 'green' });
+  if (s.instDetails.trustNet > 0) tags.push({ text: `投信買超 ${Math.round(s.instDetails.trustNet)}張`, cls: 'green' });
+  if (s.instDetails.dealerNet > 0) tags.push({ text: `自營商買超`, cls: 'blue' });
+  if (s.fundDetails.yoy && parseFloat(s.fundDetails.yoy) > 10) tags.push({ text: `營收YoY ${s.fundDetails.yoy}`, cls: 'amber' });
+  if (s.techDetails.rsi) {
+    if (s.techDetails.rsi >= 40 && s.techDetails.rsi <= 60) tags.push({ text: `RSI ${s.techDetails.rsi} 安全`, cls: 'blue' });
+  }
+  if (s.techDetails.volRatio && parseInt(s.techDetails.volRatio) > 120) tags.push({ text: `量增 ${s.techDetails.volRatio}`, cls: 'amber' });
+
+  return `<div class="cand-card">
+    <div class="cand-top">
+      <div>
+        <span class="cand-rank">#${rank}</span>
+        <span class="cand-name">${s.name}</span>
+        <span class="cand-code">${s.code}</span>
+      </div>
+      <div class="cand-score-badge ${badgeClass}">${s.totalScore}</div>
+    </div>
+    <div class="cand-meta">
+      <span>收盤 <b>${s.close.toLocaleString()}</b></span>
+      <span class="${chgClass}">${chgStr}</span>
+      <span>量 ${Math.round(s.vol).toLocaleString()} 張</span>
+      ${s.date ? `<span style="color:var(--text3)">${s.date}</span>` : ''}
+    </div>
+    <div class="score-bars">
+      <div class="sbar">
+        <div class="sbar-head"><span class="sbar-label">技術面</span><span class="sbar-val">${s.techScore}</span></div>
+        <div class="sbar-track"><div class="sbar-fill tech" style="width:${s.techScore}%"></div></div>
+      </div>
+      <div class="sbar">
+        <div class="sbar-head"><span class="sbar-label">籌碼面</span><span class="sbar-val">${s.instScore}</span></div>
+        <div class="sbar-track"><div class="sbar-fill inst" style="width:${s.instScore}%"></div></div>
+      </div>
+      <div class="sbar">
+        <div class="sbar-head"><span class="sbar-label">基本面</span><span class="sbar-val">${s.fundScore}</span></div>
+        <div class="sbar-track"><div class="sbar-fill fund" style="width:${s.fundScore}%"></div></div>
+      </div>
+    </div>
+    ${tags.length ? `<div class="cand-tags">${tags.map(t => `<span class="tag ${t.cls}">${t.text}</span>`).join('')}</div>` : ''}
+    <div class="cand-action"><a href="index.html?stock=${s.code}" target="_blank">查看詳情 &rarr;</a></div>
+  </div>`;
+}
+
+function renderTable(scored) {
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = scored.map((s, i) => {
+    const chgClass = s.chg >= 0 ? 'chg-up' : 'chg-dn';
+    const chgStr = (s.chg >= 0 ? '+' : '') + s.chg.toFixed(2) + '%';
+    return `<tr>
+      <td class="num">${i+1}</td>
+      <td>${s.code}</td>
+      <td>${s.name}</td>
+      <td class="num">${s.close.toLocaleString()}</td>
+      <td class="num ${chgClass}">${chgStr}</td>
+      <td class="num" style="font-weight:600">${s.totalScore}</td>
+      <td class="num">${s.techScore}</td>
+      <td class="num">${s.instScore}</td>
+      <td class="num">${s.fundScore}</td>
+      <td><a href="index.html?stock=${s.code}" target="_blank" style="color:var(--blue);text-decoration:none;font-size:11px">詳情</a></td>
+    </tr>`;
+  }).join('');
+}
+
+function toggleTable() {
+  const t = document.getElementById('fullTable');
+  t.classList.toggle('show');
+}
+
+function sortTable(key) {
+  if (!allResults.length) return;
+  const map = { rank: 'totalScore', code: 'code', name: 'name', close: 'close', chg: 'chg', score: 'totalScore', tech: 'techScore', inst: 'instScore', fund: 'fundScore' };
+  const field = map[key] || 'totalScore';
+  const asc = currentSort.key === key ? !currentSort.asc : false;
+  currentSort = { key, asc };
+  allResults.sort((a,b) => {
+    const va = a[field], vb = b[field];
+    if (typeof va === 'string') return asc ? va.localeCompare(vb) : vb.localeCompare(va);
+    return asc ? va - vb : vb - va;
+  });
+  renderTable(allResults);
+}
+
+</script>
+</body>
+</html>

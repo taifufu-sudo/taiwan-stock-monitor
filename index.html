@@ -182,7 +182,10 @@
       <p>日月光 3711 · 台達電 2308 · 奇鋐 3017　— v2 完整警報版</p>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
-      <div class="live-badge"><div class="live-dot"></div>FinMind API</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <a href="screener.html" style="font-size:12px;color:var(--blue);text-decoration:none;background:rgba(96,165,250,0.1);border:0.5px solid rgba(96,165,250,.3);border-radius:20px;padding:5px 12px">&larr; 選股雷達</a>
+        <div class="live-badge"><div class="live-dot"></div>FinMind API</div>
+      </div>
       <div id="lastUpdate" style="font-size:11px;color:var(--text3)"></div>
     </div>
   </div>
@@ -586,12 +589,19 @@ async function loadAll() {
       const last = price[price.length-1];
       const prev = price[price.length-2];
       const chg = prev ? ((last.close-prev.close)/prev.close*100) : 0;
-      const closes20 = price.slice(-20).map(p=>p.close);
+      // Update dynamic stock name if available
+      if (STOCKS[sid]._dynamic && last.stock_name) {
+        STOCKS[sid].name = last.stock_name;
+        const nameEl = document.querySelector(`#ov-${sid} .ov-name`);
+        if (nameEl) nameEl.textContent = last.stock_name;
+      }
       renderOverviewCard(sid, last.close, chg, price.slice(-120).map(p=>p.close), chip||[]);
 
       const chgEl = document.getElementById(`chg-${sid}`);
-      chgEl.textContent = ` ${chg>=0?'+':''}${chg.toFixed(2)}%`;
-      chgEl.className = `chg ${chg>0.05?'chg-up':chg<-0.05?'chg-dn':'chg-neu'}`;
+      if (chgEl) {
+        chgEl.textContent = ` ${chg>=0?'+':''}${chg.toFixed(2)}%`;
+        chgEl.className = `chg ${chg>0.05?'chg-up':chg<-0.05?'chg-dn':'chg-neu'}`;
+      }
     }
   }
 
@@ -671,6 +681,10 @@ function renderStock(sid) {
 
 function renderSLTP(sid, price) {
   const s = STOCKS[sid];
+  if (s._dynamic) {
+    document.getElementById('sltpRow').innerHTML = `<div style="font-size:12px;color:var(--text3);padding:8px 0">動態載入標的 — 進出場價位請至選股雷達設定後加入核心持股</div>`;
+    return;
+  }
   document.getElementById('sltpRow').innerHTML = `
     <div class="sltp-pill entry"><div class="sltp-label">建議進場</div><div class="sltp-val">${s.entry[0].toLocaleString()}–${s.entry[1].toLocaleString()}</div></div>
     <div class="sltp-pill tp1"><div class="sltp-label">第一停利</div><div class="sltp-val">${s.tp1.toLocaleString()}</div></div>
@@ -785,6 +799,46 @@ function renderChip(chipData) {
     </div>`;
   }).join('')+`<div class="chip-note">近 10 個交易日累計</div>`;
 }
+
+/* ─── ?stock= 動態載入支援 ─── */
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  const qStock = params.get('stock');
+  if (qStock && !STOCKS[qStock]) {
+    // Dynamically add stock entry with generic config
+    STOCKS[qStock] = {
+      name: qStock,
+      entry: [0, 0], tp1: 0, tp2: 0, sl: 0, breakout: 0,
+      alerts: {
+        entryDesc: '此為動態載入標的，尚無自訂進場建議。',
+        breakoutDesc: '—', slDesc: '—', tp1Desc: '—', tp2Desc: '—',
+      },
+      catalysts: [],
+      _dynamic: true,
+    };
+    // Create overview card placeholder
+    const ov = document.getElementById('overview');
+    const card = document.createElement('div');
+    card.className = 'ov-card';
+    card.id = `ov-${qStock}`;
+    card.onclick = () => selectStock(qStock);
+    card.innerHTML = `<div class="ov-top"><div><div class="ov-name">${qStock}</div><div class="ov-code">動態載入</div></div><div><div class="ov-price" id="ovp-${qStock}">—</div><div class="ov-chg" id="ovc-${qStock}">—</div></div></div><div id="ova-${qStock}"><span class="ov-alert WATCH">載入中...</span></div><div class="ov-mini-bars" id="ovb-${qStock}"></div>`;
+    ov.appendChild(card);
+    // Add tab
+    const tabs = document.querySelector('.stock-tabs');
+    if (tabs) {
+      const tab = document.createElement('button');
+      tab.className = 'stab';
+      tab.id = `tab-${qStock}`;
+      tab.onclick = () => selectStock(qStock);
+      tab.innerHTML = `${qStock} <span id="chg-${qStock}" class="chg chg-neu">—</span>`;
+      tabs.appendChild(tab);
+    }
+    currentStock = qStock;
+  } else if (qStock && STOCKS[qStock]) {
+    currentStock = qStock;
+  }
+})();
 
 loadAll();
 </script>
