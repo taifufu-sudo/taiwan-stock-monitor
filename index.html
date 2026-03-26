@@ -369,8 +369,30 @@ function showErr(msg) {
   el.textContent = msg; el.style.display = msg ? 'block' : 'none';
 }
 
-/* ─── TWSE 證交所 API ─── */
+/* ─── TWSE 證交所 API（含 CORS Proxy）─── */
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+const CORS_PROXIES = [
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+];
+
+async function fetchWithCORS(url) {
+  // Try direct first
+  try {
+    const r = await fetch(url);
+    if (r.ok) return r;
+  } catch {}
+  // Try CORS proxies
+  for (const proxy of CORS_PROXIES) {
+    try {
+      const r = await fetch(proxy(url));
+      if (r.ok) return r;
+    } catch { continue; }
+  }
+  throw new Error('所有請求方式皆失敗');
+}
 
 function parseTWSEDate(tw) {
   // "114/03/25" → "2025-03-25"
@@ -387,7 +409,7 @@ async function fetchTWSEMonthly(stockId, year, month) {
   const dateStr = `${year}${String(month).padStart(2,'0')}01`;
   const url = `https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=json&date=${dateStr}&stockNo=${stockId}`;
   try {
-    const r = await fetch(url);
+    const r = await fetchWithCORS(url);
     const j = await r.json();
     if (j.stat !== 'OK' || !j.data) return [];
     const stockName = (j.title || '').replace(/\d+年\d+月\s*/, '').trim();
@@ -430,7 +452,7 @@ async function fetchChipData(stockId, days) {
       if (d.getDay() === 0 || d.getDay() === 6) continue;
       const url = `https://www.twse.com.tw/fund/T86?response=json&date=${fmtDate(d)}&selectType=ALLBUT0999`;
       try {
-        const r = await fetch(url);
+        const r = await fetchWithCORS(url);
         const j = await r.json();
         if (j.stat === 'OK' && j.data) {
           const row = j.data.find(r => r[0].trim() === stockId);
