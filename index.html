@@ -32,8 +32,6 @@
   /* Token bar */
   .token-bar { display: flex; gap: 8px; align-items: center; background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 8px; }
   .token-bar label { font-size: 12px; color: var(--text2); white-space: nowrap; }
-  .token-bar input { flex: 1; background: var(--bg3); border: 0.5px solid var(--border2); border-radius: var(--radius-sm); color: var(--text); font-size: 12px; padding: 6px 10px; outline: none; }
-  .token-bar input:focus { border-color: var(--accent); }
   .token-note { font-size: 11px; color: var(--text3); margin-bottom: 20px; }
   .token-note a { color: var(--blue); text-decoration: none; }
 
@@ -184,20 +182,18 @@
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
       <div style="display:flex;gap:8px;align-items:center">
         <a href="screener.html" style="font-size:12px;color:var(--blue);text-decoration:none;background:rgba(96,165,250,0.1);border:0.5px solid rgba(96,165,250,.3);border-radius:20px;padding:5px 12px">&larr; 選股雷達</a>
-        <div class="live-badge"><div class="live-dot"></div>FinMind API</div>
+        <div class="live-badge"><div class="live-dot"></div>TWSE 證交所</div>
       </div>
       <div id="lastUpdate" style="font-size:11px;color:var(--text3)"></div>
     </div>
   </div>
 
-  <!-- Token -->
+  <!-- Refresh -->
   <div class="token-bar">
-    <label>FinMind Token</label>
-    <input type="password" id="tokenInput" placeholder="選填：貼上 token 可提升請求上限"/>
-    <button class="primary" onclick="applyToken()">套用</button>
-    <button onclick="loadAll()" id="refreshBtn">重新載入</button>
+    <label>TWSE 證交所公開資料</label>
+    <button class="primary" onclick="loadAll()" id="refreshBtn">重新載入</button>
   </div>
-  <p class="token-note">免費版 300次/小時，收盤後更新。免費註冊 <a href="https://finmindtrade.com" target="_blank">finmindtrade.com</a> 可升至 600次/小時。</p>
+  <p class="token-note">資料來源：證交所公開 API，無需 Token，每日收盤後更新。</p>
 
   <div class="err" id="errBox"></div>
 
@@ -290,7 +286,7 @@
   <div class="catalyst-card" id="catalystCard"></div>
 
   <div class="footer">
-    資料來源：<a href="https://finmindtrade.com" target="_blank">FinMind 開放資料</a> · 每日收盤後更新<br>
+    資料來源：<a href="https://www.twse.com.tw" target="_blank">臺灣證券交易所</a> · 每日收盤後更新<br>
     技術指標由本工具計算 · 本工具為輔助分析，不構成投資建議 · 投資有風險，請審慎評估
   </div>
 </div>
@@ -362,29 +358,98 @@ const STOCKS = {
   }
 };
 
-const API = 'https://api.finmindtrade.com/api/v4/data';
-let token = '';
 let currentStock = '3711';
 let currentDays = 120;
 let priceChart = null;
 let allData = {};
-
-function applyToken() { token = document.getElementById('tokenInput').value.trim(); showErr(''); loadAll(); }
 
 function showErr(msg) {
   const el = document.getElementById('errBox');
   el.textContent = msg; el.style.display = msg ? 'block' : 'none';
 }
 
-async function fetchData(dataset, stockId, startDate) {
-  const params = new URLSearchParams({ dataset, data_id: stockId, start_date: startDate });
-  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+/* ─── TWSE 證交所 API ─── */
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function parseTWSEDate(tw) {
+  // "114/03/25" → "2025-03-25"
+  const [y, m, d] = tw.split('/');
+  return `${+y + 1911}-${m}-${d}`;
+}
+
+function parseNum(s) {
+  if (!s || s === '--') return 0;
+  return parseFloat(String(s).replace(/,/g, ''));
+}
+
+async function fetchTWSEMonthly(stockId, year, month) {
+  const dateStr = `${year}${String(month).padStart(2,'0')}01`;
+  const url = `https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=json&date=${dateStr}&stockNo=${stockId}`;
   try {
-    const r = await fetch(`${API}?${params}`, { headers });
+    const r = await fetch(url);
     const j = await r.json();
-    if (j.msg && j.msg !== 'success') throw new Error(j.msg);
-    return j.data || [];
-  } catch(e) { console.error(e); return null; }
+    if (j.stat !== 'OK' || !j.data) return [];
+    const stockName = (j.title || '').replace(/\d+年\d+月\s*/, '').trim();
+    return j.data.map(row => ({
+      date: parseTWSEDate(row[0]),
+      Trading_Volume: parseNum(row[1]),
+      open: parseNum(row[3]),
+      max: parseNum(row[4]),
+      min: parseNum(row[5]),
+      close: parseNum(row[6]),
+      stock_name: stockName,
+    }));
+  } catch(e) { console.error('TWSE price error:', e); return []; }
+}
+
+async function fetchStockPrice(stockId, days) {
+  const now = new Date();
+  const months = Math.ceil((days + 60) / 30);
+  let allRows = [];
+  for (let i = months - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const rows = await fetchTWSEMonthly(stockId, d.getFullYear(), d.getMonth() + 1);
+    allRows = allRows.concat(rows);
+    if (i > 0) await sleep(350); // 避免過快被擋
+  }
+  // 去重（跨月可能重疊）
+  const seen = new Set();
+  return allRows.filter(r => { if (seen.has(r.date)) return false; seen.add(r.date); return true; });
+}
+
+async function fetchChipData(stockId, days) {
+  const results = [];
+  const now = new Date();
+  const fmtDate = (d) => `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+
+  try {
+    for (let i = 0; i < Math.min(days, 15); i++) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      if (d.getDay() === 0 || d.getDay() === 6) continue;
+      const url = `https://www.twse.com.tw/fund/T86?response=json&date=${fmtDate(d)}&selectType=ALLBUT0999`;
+      try {
+        const r = await fetch(url);
+        const j = await r.json();
+        if (j.stat === 'OK' && j.data) {
+          const row = j.data.find(r => r[0].trim() === stockId);
+          if (row) {
+            results.push({
+              date: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`,
+              Foreign_Investor_Buy: parseNum(row[2]),
+              Foreign_Investor_Sell: parseNum(row[3]),
+              Investment_Trust_Buy: parseNum(row[5]),
+              Investment_Trust_Sell: parseNum(row[6]),
+              Dealer_Buy: parseNum(row[8]),
+              Dealer_Sell: parseNum(row[9]),
+            });
+          }
+        }
+      } catch(e) { /* skip this day */ }
+      await sleep(350);
+    }
+  } catch(e) { console.error('TWSE chip error:', e); }
+  return results.reverse();
 }
 
 function getStartDate(days) {
@@ -573,39 +638,44 @@ async function loadAll() {
   const btn = document.getElementById('refreshBtn');
   btn.textContent = '載入中...'; btn.disabled = true; showErr('');
 
-  const startDate = getStartDate(365);
-  const chipStart = getStartDate(30);
-
   let anyFail = false;
-  for (const sid of Object.keys(STOCKS)) {
-    const [price, chip] = await Promise.all([
-      fetchData('TaiwanStockPrice', sid, startDate),
-      fetchData('TaiwanStockInstitutionalInvestorsBuySell', sid, chipStart)
-    ]);
-    if (price === null) anyFail = true;
-    allData[sid] = { price: price || [], chip: chip || [] };
+  const sids = Object.keys(STOCKS);
 
-    if (price && price.length > 0) {
-      const last = price[price.length-1];
-      const prev = price[price.length-2];
-      const chg = prev ? ((last.close-prev.close)/prev.close*100) : 0;
-      // Update dynamic stock name if available
-      if (STOCKS[sid]._dynamic && last.stock_name) {
-        STOCKS[sid].name = last.stock_name;
-        const nameEl = document.querySelector(`#ov-${sid} .ov-name`);
-        if (nameEl) nameEl.textContent = last.stock_name;
-      }
-      renderOverviewCard(sid, last.close, chg, price.slice(-120).map(p=>p.close), chip||[]);
+  for (let idx = 0; idx < sids.length; idx++) {
+    const sid = sids[idx];
+    btn.textContent = `載入中 (${idx+1}/${sids.length})...`;
+    try {
+      const price = await fetchStockPrice(sid, 400);
+      const chip = await fetchChipData(sid, 15);
+      allData[sid] = { price: price || [], chip: chip || [] };
 
-      const chgEl = document.getElementById(`chg-${sid}`);
-      if (chgEl) {
-        chgEl.textContent = ` ${chg>=0?'+':''}${chg.toFixed(2)}%`;
-        chgEl.className = `chg ${chg>0.05?'chg-up':chg<-0.05?'chg-dn':'chg-neu'}`;
+      if (price && price.length > 0) {
+        const last = price[price.length-1];
+        const prev = price[price.length-2];
+        const chg = prev ? ((last.close-prev.close)/prev.close*100) : 0;
+        if (STOCKS[sid]._dynamic && last.stock_name) {
+          STOCKS[sid].name = last.stock_name;
+          const nameEl = document.querySelector(`#ov-${sid} .ov-name`);
+          if (nameEl) nameEl.textContent = last.stock_name;
+        }
+        renderOverviewCard(sid, last.close, chg, price.slice(-120).map(p=>p.close), chip||[]);
+
+        const chgEl = document.getElementById(`chg-${sid}`);
+        if (chgEl) {
+          chgEl.textContent = ` ${chg>=0?'+':''}${chg.toFixed(2)}%`;
+          chgEl.className = `chg ${chg>0.05?'chg-up':chg<-0.05?'chg-dn':'chg-neu'}`;
+        }
+      } else {
+        anyFail = true;
       }
+    } catch(e) {
+      console.error(`Failed to load ${sid}:`, e);
+      anyFail = true;
+      allData[sid] = { price: [], chip: [] };
     }
   }
 
-  if (anyFail) showErr('部分資料載入失敗，可能已達免費額度上限（300次/小時）。請稍後再試或輸入 FinMind Token。');
+  if (anyFail) showErr('部分資料載入失敗，請稍後再試。');
 
   btn.textContent = '重新載入'; btn.disabled = false;
   const now = new Date();
