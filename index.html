@@ -694,7 +694,14 @@ function renderCatalyst(sid) {
 function renderOverviewCard(sid, price, chgPct, closes, chipData) {
   const s = STOCKS[sid];
   const sig = evaluateSignal(sid, price, closes, chipData);
-  const labels = { BUY:'進場訊號', WATCH:'觀察等待', CAUTION:'注意警示', HOLD:'持倉管理' };
+  let ovLabel;
+  if (sig.status === 'WATCH') {
+    if (price > s.entry[1] && s.status === '暫停追進') ovLabel = '暫停追進';
+    else if (price > s.entry[1]) ovLabel = '等待回測';
+    else ovLabel = '觀察等待';
+  } else {
+    ovLabel = { BUY:'進場訊號', CAUTION:'注意警示', HOLD:'持倉管理' }[sig.status] || sig.status;
+  }
   const sign = chgPct >= 0 ? '+' : '';
   const chgColor = chgPct > 0.05 ? 'var(--green)' : chgPct < -0.05 ? 'var(--red)' : 'var(--text2)';
 
@@ -702,7 +709,7 @@ function renderOverviewCard(sid, price, chgPct, closes, chipData) {
   document.getElementById(`ovp-${sid}`).style.color = chgColor;
   document.getElementById(`ovc-${sid}`).textContent = `${sign}${chgPct.toFixed(2)}%`;
   document.getElementById(`ovc-${sid}`).style.color = chgColor;
-  document.getElementById(`ova-${sid}`).innerHTML = `<span class="ov-alert ${sig.status}">${labels[sig.status]}</span>`;
+  document.getElementById(`ova-${sid}`).innerHTML = `<span class="ov-alert ${sig.status}">${ovLabel}</span>`;
 
   // mini sparkline
   const mini = closes.slice(-20);
@@ -769,15 +776,50 @@ async function loadAll() {
 }
 
 function renderAdvicePanel() {
-  const statusMap = { '進場訊號': 'buy', '等待回測': 'wait', '暫停追進': 'stop' };
-  const statusLabel = { 'buy': '進場訊號', 'wait': '等待回測', 'stop': '暫停追進' };
+  // 信號對應：evaluateSignal 的 status → 顯示樣式
+  const sigToClass = { BUY: 'buy', WATCH: 'wait', CAUTION: 'stop', HOLD: 'wait' };
+  const sigToLabel = {
+    BUY: '進場訊號',
+    WATCH_PULLBACK: '等待回測',
+    WATCH_OVERHEAT: '暫停追進',
+    WATCH_LOW: '等待反彈',
+    WATCH: '觀察等待',
+    CAUTION: '注意警示',
+    HOLD: '持倉管理',
+  };
 
   let cards = '';
   for (const [sid, s] of Object.entries(STOCKS)) {
     if (s._dynamic) continue;
     const d = allData[sid];
     const price = d && d.price.length ? d.price[d.price.length-1].close : s.lastPrice;
-    const cls = statusMap[s.status] || 'wait';
+    const closes = d && d.price.length ? d.price.slice(-120).map(p=>p.close) : [];
+    const chip = d ? d.chip : [];
+
+    // 用 evaluateSignal 動態計算，與看板一致
+    let sigStatus, sigLabel;
+    if (closes.length > 0) {
+      const sig = evaluateSignal(sid, price, closes, chip);
+      sigStatus = sig.status;
+      // 細分 WATCH 子狀態
+      if (sigStatus === 'WATCH') {
+        if (price > s.entry[1] && s.status === '暫停追進') {
+          sigLabel = '暫停追進';
+        } else if (price > s.entry[1]) {
+          sigLabel = '等待回測';
+        } else {
+          sigLabel = '等待反彈';
+        }
+      } else {
+        sigLabel = sigToLabel[sigStatus] || sigStatus;
+      }
+    } else {
+      // API 未載入，用靜態設定
+      sigStatus = s.status === '進場訊號' ? 'BUY' : 'WATCH';
+      sigLabel = s.status;
+    }
+
+    const cls = sigStatus === 'BUY' ? 'buy' : sigStatus === 'CAUTION' ? 'stop' : 'wait';
     const tp1Pct = ((s.tp1 - price) / price * 100).toFixed(0);
     const tp2Pct = ((s.tp2 - price) / price * 100).toFixed(0);
     const slPct = ((s.sl - price) / price * 100).toFixed(0);
@@ -786,7 +828,7 @@ function renderAdvicePanel() {
       <div class="advice-card ${cls}">
         <div class="advice-top">
           <div class="advice-stock">${s.name} ${sid}</div>
-          <div class="advice-status ${cls}">${s.status}</div>
+          <div class="advice-status ${cls}">${sigLabel}</div>
         </div>
         <div class="advice-meta">
           <div class="advice-tag"><b>${s.theme}</b> ${s.weight}%</div>
