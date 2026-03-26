@@ -621,23 +621,21 @@ function evaluateSignal(sid, price, closes, chipData) {
     headline = '突破訊號：帶量突破前高壓力';
     body = `現價 ${price.toLocaleString()} 元突破關鍵壓力 ${s.breakout.toLocaleString()} 元。${s.alerts.breakoutDesc} 目標停利 ${s.tp2.toLocaleString()} 元，停損守 ${s.sl.toLocaleString()} 元。`;
   } else if (conds.inEntry) {
-    const passCount = [conds.goldenMA, conds.rsiBuy, conds.chipBuy].filter(Boolean).length;
-    if (passCount >= 2) {
-      status = 'BUY';
-      headline = '進場訊號：現價在建議進場區，條件吻合';
-    } else {
-      status = 'WATCH';
-      headline = '觀察：現價在進場區，但條件未全滿足';
-    }
+    status = 'BUY';
+    headline = '進場訊號：現價在建議進場區';
     body = `現價 ${price.toLocaleString()} 元落在進場區 ${s.entry[0].toLocaleString()}–${s.entry[1].toLocaleString()} 元。${s.alerts.entryDesc} 第一停利 ${s.tp1.toLocaleString()}，目標停利 ${s.tp2.toLocaleString()}，停損 ${s.sl.toLocaleString()} 元。`;
   } else if (price < s.entry[0]) {
     status = 'WATCH';
     headline = '觀察：低於進場區，等待反彈確認';
     body = `現價 ${price.toLocaleString()} 元低於進場區下緣 ${s.entry[0].toLocaleString()} 元。等待止跌訊號（量縮帶長下影線）後再建倉。季線 ${Math.round(ma60).toLocaleString()} 元為關鍵支撐，若跌破停損線 ${s.sl.toLocaleString()} 元需重新評估。`;
+  } else if (price > s.entry[1] && price < s.breakout) {
+    status = 'WATCH';
+    headline = '等待回測：現價高於進場區';
+    body = `現價 ${price.toLocaleString()} 元高於進場區上緣 ${s.entry[1].toLocaleString()} 元。等待回測至進場區 ${s.entry[0].toLocaleString()}–${s.entry[1].toLocaleString()} 元縮量止跌後再建倉。`;
   } else {
     status = 'WATCH';
-    headline = '觀察：現價高於進場區，等待回測';
-    body = `現價 ${price.toLocaleString()} 元高於進場區上緣 ${s.entry[1].toLocaleString()} 元。等待回測進場區或帶量突破 ${s.breakout.toLocaleString()} 元。季線 ${Math.round(ma60).toLocaleString()} 元為主要支撐。`;
+    headline = s.status === '暫停追進' ? '暫停追進：短線過熱' : '觀察：等待回測';
+    body = `現價 ${price.toLocaleString()} 元高於進場區。${s.alerts.entryDesc}`;
   }
 
   return { status, headline, body, rsi, ma5, ma20, ma60, macd, golden, chipBullish, conds, price };
