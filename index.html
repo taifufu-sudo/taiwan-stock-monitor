@@ -157,6 +157,38 @@
   .cat-title { font-size: 13px; color: var(--text); font-weight: 500; margin-bottom: 2px; }
   .cat-desc { font-size: 11px; color: var(--text3); line-height: 1.5; }
 
+  /* ── ADVICE PANEL ── */
+  .advice-section { margin-bottom: 20px; }
+  .advice-section h3 { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 12px; }
+  .advice-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
+  @media(max-width:700px){ .advice-grid { grid-template-columns: 1fr; } }
+  .advice-card { background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 14px; position: relative; overflow: hidden; }
+  .advice-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+  .advice-card.buy::before { background: var(--green); }
+  .advice-card.wait::before { background: var(--amber); }
+  .advice-card.stop::before { background: var(--red); }
+  .advice-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .advice-stock { font-size: 15px; font-weight: 600; color: var(--text); }
+  .advice-status { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+  .advice-status.buy { background: var(--green-bg); color: var(--green); border: 0.5px solid var(--green-border); }
+  .advice-status.wait { background: rgba(251,191,36,.08); color: var(--amber); border: 0.5px solid rgba(251,191,36,.2); }
+  .advice-status.stop { background: rgba(248,113,113,.08); color: var(--red); border: 0.5px solid rgba(248,113,113,.2); }
+  .advice-meta { display: flex; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+  .advice-tag { font-size: 11px; color: var(--text3); }
+  .advice-tag b { color: var(--text2); font-weight: 500; }
+  .advice-text { font-size: 12px; color: var(--text2); line-height: 1.6; }
+  .advice-rr { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 0.5px solid var(--border); }
+  .advice-rr-item { text-align: center; }
+  .advice-rr-label { font-size: 10px; color: var(--text3); margin-bottom: 2px; }
+  .advice-rr-val { font-size: 13px; font-weight: 600; }
+
+  /* Portfolio Summary */
+  .portfolio-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
+  @media(max-width:600px){ .portfolio-summary { grid-template-columns: repeat(2, 1fr); } }
+  .ps-card { background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 12px 14px; text-align: center; }
+  .ps-label { font-size: 11px; color: var(--text3); margin-bottom: 4px; }
+  .ps-val { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -.3px; }
+
   /* Loading */
   .loading { display: flex; align-items: center; gap: 8px; color: var(--text2); font-size: 13px; padding: 20px 0; }
   .spinner { width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
@@ -224,6 +256,17 @@
       <div id="ova-3017"><span class="ov-alert WATCH">載入中...</span></div>
       <div class="ov-mini-bars" id="ovb-3017"></div>
     </div>
+  </div>
+
+  <!-- ── 操作建議面板 ── -->
+  <div class="advice-section" id="adviceSection"></div>
+
+  <!-- ── 組合摘要 ── -->
+  <div class="portfolio-summary" id="portfolioSummary">
+    <div class="ps-card"><div class="ps-label">組合目標報酬</div><div class="ps-val" style="color:var(--green)">+18~26%</div></div>
+    <div class="ps-card"><div class="ps-label">最大虧損情境</div><div class="ps-val" style="color:var(--red)">-10~13%</div></div>
+    <div class="ps-card"><div class="ps-label">平均風報比</div><div class="ps-val">1 : 2.2</div></div>
+    <div class="ps-card"><div class="ps-label">持股題材</div><div class="ps-val" style="font-size:13px">三主線不重疊</div></div>
   </div>
 
   <!-- Stock tabs (hidden, synced with overview) -->
@@ -299,15 +342,21 @@
 const STOCKS = {
   '3711': {
     name: '日月光投控',
+    weight: 40,
+    theme: '核心主力',
+    status: '進場訊號',
+    lastPrice: 348,
+    riskReward: '1:2.0',
+    advice: '3/26 收 348 元，落在進場區 340–360 元內。籌碼穩健，建議建首批 50% 部位，剩餘等回調至 340 元以下再補倉。',
     entry: [340, 360],
     tp1: 400,
     tp2: 430,
-    sl: 305,
+    sl: 295,
     breakout: 365,
     alerts: {
-      entryDesc: '3/26 收 348 元，落在進場區內，可建首批 50% 部位。核心主力佔比 40%，風報比 1:2.0。',
+      entryDesc: '3/26 收 348 元，落在進場區 340–360 元內。籌碼穩健，建議建首批 50% 部位，剩餘等回調至 340 元以下再補倉。',
       breakoutDesc: '帶量突破 365 元確認多頭延續，可加碼至滿倉，目標看 430 元。',
-      slDesc: '跌破 305 元（-13%），先進封裝預期轉弱，無條件停損出場。',
+      slDesc: '跌破 295 元（-13%），先進封裝預期轉弱，無條件停損出場。',
       tp1Desc: '達 400 元出 1/3 部位鎖利（+15%），停損上移至成本，剩餘續抱。',
       tp2Desc: '達 430 元再出 1/3（+26%），最後 1/3 跟 5 日線移動停利。',
     },
@@ -319,13 +368,19 @@ const STOCKS = {
   },
   '2308': {
     name: '台達電',
+    weight: 35,
+    theme: '核心主力',
+    status: '等待回測',
+    lastPrice: 1550,
+    riskReward: '1:2.6',
+    advice: '3/26 收 1,550 元，仍高於進場區。漲停後持平，正在消化。等回測至 1,480–1,530 縮量止跌後再建倉。',
     entry: [1480, 1530],
     tp1: 1680,
     tp2: 1800,
     sl: 1360,
     breakout: 1560,
     alerts: {
-      entryDesc: '3/26 收 1,550 元，高於進場區，等回測至 1,480–1,530 元再進場。核心主力佔比 35%，風報比 1:2.6。',
+      entryDesc: '3/26 收 1,550 元，仍高於進場區。漲停後持平，正在消化。等回測至 1,480–1,530 縮量止跌後再建倉。',
       breakoutDesc: '帶量站穩突破 1,560 元確認新一段多頭，目標上看 1,800 元。',
       slDesc: '跌破 1,360 元（-8%），顯示反彈為過熱反應，無條件停損出場。',
       tp1Desc: '達 1,680 元出 1/3 部位（+11%），停損上移成本，剩餘續抱。',
@@ -339,13 +394,19 @@ const STOCKS = {
   },
   '3017': {
     name: '奇鋐',
+    weight: 25,
+    theme: '衛星加速',
+    status: '暫停追進',
+    lastPrice: 2290,
+    riskReward: '1:2.1',
+    advice: '連兩天大漲累計 +25%，SpaceX IPO 題材疊加 AI 液冷，短線過熱。等情緒降溫回測 2,100–2,250 再進。',
     entry: [2100, 2250],
     tp1: 2500,
     tp2: 2700,
     sl: 1900,
     breakout: 2300,
     alerts: {
-      entryDesc: '3/26 收 2,290 元，連兩天大漲 +25%，SpaceX 題材，暫停追進，等回測 2,100–2,250 再進。衛星加速佔比 25%，風報比 1:2.1。',
+      entryDesc: '3/26 收 2,290 元，連兩天大漲累計 +25%，SpaceX IPO 題材疊加 AI 液冷，短線過熱。等情緒降溫回測 2,100–2,250 再進。',
       breakoutDesc: '帶量突破 2,300 元新高，ASIC 訂單放量加速確認，多頭繼續，目標看 2,700 元。',
       slDesc: '跌破 1,900 元（-12%），液冷滲透率預期下修，停損出場。',
       tp1Desc: '達 2,500 元出 1/3 部位（+14%），停損上移成本，剩餘續抱。',
@@ -705,7 +766,56 @@ async function loadAll() {
   document.getElementById('lastUpdate').textContent =
     `更新於 ${now.toLocaleDateString('zh-TW')} ${now.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})}`;
 
+  renderAdvicePanel();
   renderStock(currentStock);
+}
+
+function renderAdvicePanel() {
+  const statusMap = { '進場訊號': 'buy', '等待回測': 'wait', '暫停追進': 'stop' };
+  const statusLabel = { 'buy': '進場訊號', 'wait': '等待回測', 'stop': '暫停追進' };
+
+  let cards = '';
+  for (const [sid, s] of Object.entries(STOCKS)) {
+    if (s._dynamic) continue;
+    const d = allData[sid];
+    const price = d && d.price.length ? d.price[d.price.length-1].close : s.lastPrice;
+    const cls = statusMap[s.status] || 'wait';
+    const tp1Pct = ((s.tp1 - price) / price * 100).toFixed(0);
+    const tp2Pct = ((s.tp2 - price) / price * 100).toFixed(0);
+    const slPct = ((s.sl - price) / price * 100).toFixed(0);
+
+    cards += `
+      <div class="advice-card ${cls}">
+        <div class="advice-top">
+          <div class="advice-stock">${s.name} ${sid}</div>
+          <div class="advice-status ${cls}">${s.status}</div>
+        </div>
+        <div class="advice-meta">
+          <div class="advice-tag"><b>${s.theme}</b> ${s.weight}%</div>
+          <div class="advice-tag">風報比 <b>${s.riskReward}</b></div>
+          <div class="advice-tag">現價 <b>${price.toLocaleString()}</b></div>
+        </div>
+        <div class="advice-text">${s.advice}</div>
+        <div class="advice-rr">
+          <div class="advice-rr-item">
+            <div class="advice-rr-label">第一停利</div>
+            <div class="advice-rr-val" style="color:var(--green)">+${tp1Pct}%</div>
+          </div>
+          <div class="advice-rr-item">
+            <div class="advice-rr-label">目標停利</div>
+            <div class="advice-rr-val" style="color:var(--green)">+${tp2Pct}%</div>
+          </div>
+          <div class="advice-rr-item">
+            <div class="advice-rr-label">最大停損</div>
+            <div class="advice-rr-val" style="color:var(--red)">${slPct}%</div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  document.getElementById('adviceSection').innerHTML = `
+    <h3>操作建議（3/26 更新）</h3>
+    <div class="advice-grid">${cards}</div>`;
 }
 
 function selectStock(sid) {
