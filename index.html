@@ -256,6 +256,14 @@
       <div id="ova-3017"><span class="ov-alert WATCH">載入中...</span></div>
       <div class="ov-mini-bars" id="ovb-3017"></div>
     </div>
+    <div class="ov-card" onclick="selectStock('2454')" id="ov-2454">
+      <div class="ov-top">
+        <div><div class="ov-name">聯發科</div><div class="ov-code">2454</div></div>
+        <div><div class="ov-price" id="ovp-2454">—</div><div class="ov-chg" id="ovc-2454">—</div></div>
+      </div>
+      <div id="ova-2454"><span class="ov-alert WATCH">載入中...</span></div>
+      <div class="ov-mini-bars" id="ovb-2454"></div>
+    </div>
   </div>
 
   <!-- Stock tabs (hidden, synced with overview) -->
@@ -263,6 +271,7 @@
     <div class="stab active" onclick="selectStock('3711')" id="tab-3711"><span>日月光 3711</span><span class="chg chg-neu" id="chg-3711">—</span></div>
     <div class="stab" onclick="selectStock('2308')" id="tab-2308"><span>台達電 2308</span><span class="chg chg-neu" id="chg-2308">—</span></div>
     <div class="stab" onclick="selectStock('3017')" id="tab-3017"><span>奇鋐 3017</span><span class="chg chg-neu" id="chg-3017">—</span></div>
+    <div class="stab" onclick="selectStock('2454')" id="tab-2454"><span>聯發科 2454</span><span class="chg chg-neu" id="chg-2454">—</span></div>
   </div>
 
   <!-- Metrics -->
@@ -518,13 +527,13 @@ async function fetchTWSEMonthly(stockId, year, month) {
 
 async function fetchStockPrice(stockId, days) {
   const now = new Date();
-  const months = Math.ceil((days + 60) / 30);
+  const months = Math.min(Math.ceil((days + 60) / 30), 6); // 最多抓 6 個月避免過多請求
   let allRows = [];
   for (let i = months - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const rows = await fetchTWSEMonthly(stockId, d.getFullYear(), d.getMonth() + 1);
     allRows = allRows.concat(rows);
-    if (i > 0) await sleep(350); // 避免過快被擋
+    if (i > 0) await sleep(500); // 避免過快被擋
   }
   // 去重（跨月可能重疊）
   const seen = new Set();
@@ -537,7 +546,7 @@ async function fetchChipData(stockId, days) {
   const fmtDate = (d) => `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
 
   try {
-    for (let i = 0; i < Math.min(days, 15); i++) {
+    for (let i = 0; i < Math.min(days, 5); i++) {
       const d = new Date(now);
       d.setDate(d.getDate() - i);
       if (d.getDay() === 0 || d.getDay() === 6) continue;
@@ -762,10 +771,12 @@ async function loadAll() {
 
   for (let idx = 0; idx < sids.length; idx++) {
     const sid = sids[idx];
-    btn.textContent = `載入中 (${idx+1}/${sids.length})...`;
+    if (STOCKS[sid]._dynamic) continue;
+    btn.textContent = `載入 ${STOCKS[sid].name} (${idx+1}/${sids.length})...`;
+    if (idx > 0) await sleep(1000); // 股票之間間隔 1 秒避免 TWSE 限流
     try {
-      const price = await fetchStockPrice(sid, 400);
-      const chip = await fetchChipData(sid, 15);
+      const price = await fetchStockPrice(sid, 180);
+      const chip = await fetchChipData(sid, 5);
       allData[sid] = { price: price || [], chip: chip || [] };
 
       if (price && price.length > 0) {
