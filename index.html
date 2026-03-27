@@ -345,24 +345,24 @@ const STOCKS = {
     weight: 40,
     theme: '核心主力',
     status: '進場訊號',
-    lastPrice: 348,
+    lastPrice: 353.5,
     riskReward: '1:2.0',
-    adviceIn: '落在進場區內，籌碼穩健，建議建首批 50% 部位，剩餘等回調至 340 元以下再補倉。',
+    adviceIn: '本週三日收盤全在進場區 340–360 元內，四檔中位置最正確。建議建首批 50% 部位，345 元附近可再補第二批 30%。4/2 關稅日前分批建，勿一次滿倉。',
     adviceOut: '高於進場區，等回測至 340–360 元支撐區縮量止跌後再建倉。',
     entry: [340, 360],
     tp1: 400,
     tp2: 430,
     sl: 295,
-    breakout: 365,
+    breakout: 380,
     alerts: {
-      entryDesc: '籌碼穩健，建議建首批 50% 部位，剩餘等回調至 340 元以下再補倉。',
-      breakoutDesc: '帶量突破 365 元確認多頭延續，可加碼至滿倉，目標看 430 元。',
-      slDesc: '跌破 295 元（-13%），先進封裝預期轉弱，無條件停損出場。',
-      tp1Desc: '達 400 元出 1/3 部位鎖利（+15%），停損上移至成本，剩餘續抱。',
-      tp2Desc: '達 430 元再出 1/3（+26%），最後 1/3 跟 5 日線移動停利。',
+      entryDesc: '本週三日收盤全在進場區內，是四檔中位置最正確的。建首批 50% 部位，345 元附近可再補 30%。',
+      breakoutDesc: '帶量突破 380 元確認多頭延續，可加碼至滿倉，目標看 430 元。',
+      slDesc: '跌破 295 元（-17%），先進封裝預期轉弱，無條件停損出場。',
+      tp1Desc: '達 400 元出 1/3 部位鎖利（+13%），停損上移至成本，剩餘續抱。',
+      tp2Desc: '達 430 元再出 1/3（+22%），最後 1/3 跟 5 日線移動停利。',
     },
     catalysts: [
-      { date: '2026/04（預估）', title: 'Q1 財報發布', desc: '法人預估 EPS 2.8–3.1 元，若優於預期可觸發突破前高。' },
+      { date: '2026/04（預估）', title: 'Q1 財報發布', desc: '2025 全年 EPS 9.37 元年增 25%，Q1 財報前是最好的布局窗口。' },
       { date: '2026 上半年', title: 'FOCoS 訂單落地', desc: 'AWS Trainium 3、AMD Venice CPU 自研 CoWoS 訂單確認，關鍵驗證里程碑。' },
       { date: '2026 下半年', title: '月產能衝 2 萬片', desc: 'CoWoS 月產能從 9,000 片升至 20,000 片，若提前達標帶動評價重估。' },
     ]
@@ -371,22 +371,22 @@ const STOCKS = {
     name: '台達電',
     weight: 35,
     theme: '核心主力',
-    status: '等待回測',
-    lastPrice: 1550,
+    status: '等待止跌',
+    lastPrice: 1510,
     riskReward: '1:2.6',
-    adviceIn: '落在進場區內，漲停後消化完成，可分批建倉。',
-    adviceOut: '仍高於進場區，漲停後正在消化，等回測至 1,480–1,530 縮量止跌後再建倉。',
+    adviceIn: '已進入進場區，量縮拋壓漸輕。等縮量止跌 K 棒（下影線長）確認再建倉，不搶跑。',
+    adviceOut: '緩步回測中，距進場區上緣僅 20 元，下週初可能觸及。等進場區內縮量止跌再建倉，不提前進場。',
     entry: [1480, 1530],
     tp1: 1680,
     tp2: 1800,
     sl: 1360,
     breakout: 1560,
     alerts: {
-      entryDesc: '等回測至 1,480–1,530 縮量止跌後再建倉。',
+      entryDesc: '距進場區僅 20 元，量縮拋壓漸輕。等進場區內縮量止跌 K 棒確認再建倉。',
       breakoutDesc: '帶量站穩突破 1,560 元確認新一段多頭，目標上看 1,800 元。',
-      slDesc: '跌破 1,360 元（-8%），顯示反彈為過熱反應，無條件停損出場。',
+      slDesc: '跌破 1,360 元（-10%），顯示反彈為過熱反應，無條件停損出場。',
       tp1Desc: '達 1,680 元出 1/3 部位（+11%），停損上移成本，剩餘續抱。',
-      tp2Desc: '達 1,800 元再出 1/3（+21%），最後 1/3 移動停利跟 5 日線。',
+      tp2Desc: '達 1,800 元再出 1/3（+19%），最後 1/3 移動停利跟 5 日線。',
     },
     catalysts: [
       { date: '2026/04/23', title: 'Q1 財報', desc: '法人預估 EPS 7.27 元，若優於預期仍有上行空間。' },
@@ -399,19 +399,19 @@ const STOCKS = {
     weight: 25,
     theme: '衛星加速',
     status: '暫停追進',
-    lastPrice: 2290,
+    lastPrice: 2195,
     riskReward: '1:2.1',
-    adviceIn: '回測至進場區，SpaceX + AI 液冷雙題材未變，可分批建倉。',
-    adviceOut: 'SpaceX IPO 題材疊加 AI 液冷，短線過熱，等情緒降溫回測 2,100–2,250 再進。',
+    adviceIn: '回測至進場區，SpaceX + AI 液冷雙題材未變，縮量守穩可分批建倉。',
+    adviceOut: '本週大漲 25% 後回落修正中，仍高於進場區。持續觀察，若跌破 2,250 收盤仍守穩，可開始評估進場。SpaceX 題材若落空需提防急速回落。',
     entry: [2100, 2250],
     tp1: 2500,
     tp2: 2700,
     sl: 1900,
     breakout: 2300,
     alerts: {
-      entryDesc: 'SpaceX IPO 題材疊加 AI 液冷，短線過熱，等情緒降溫回測 2,100–2,250 再進。',
+      entryDesc: '大漲後修正中，仍高於進場區。繼續等待回測至 2,100–2,250 縮量守穩再進場。',
       breakoutDesc: '帶量突破 2,300 元新高，ASIC 訂單放量加速確認，多頭繼續，目標看 2,700 元。',
-      slDesc: '跌破 1,900 元（-12%），液冷滲透率預期下修，停損出場。',
+      slDesc: '跌破 1,900 元（-13%），液冷滲透率預期下修，停損出場。',
       tp1Desc: '達 2,500 元出 1/3 部位（+14%），停損上移成本，剩餘續抱。',
       tp2Desc: '達 2,700 元再出 1/3（+25%），最後 1/3 跟 5 日線移動停利。',
     },
@@ -425,27 +425,27 @@ const STOCKS = {
     name: '聯發科',
     weight: 0,
     theme: '★ 觀察中',
-    status: '等待回測',
-    lastPrice: 1590,
+    status: '接近進場',
+    lastPrice: 1585,
     riskReward: '1:2.4',
-    adviceIn: '回測至進場區，縮量守穩可分批建倉。',
-    adviceOut: '昨日大漲後今日整理，方向正確。等縮量守穩 1,500–1,580 再建倉。',
+    adviceIn: '已落入進場區，連三日縮量整理浮額洗出中。縮量守穩 1,560 以上可建首批 30% 試單。',
+    adviceOut: '連三日縮量小跌，浮額正在洗出，進場條件趨近成熟。觸及進場區上緣附近，下週一觀察量能，縮量守穩 1,560 以上即建首批 30% 試單。',
     entry: [1450, 1580],
     tp1: 1800,
     tp2: 2100,
     sl: 1380,
-    breakout: 1620,
+    breakout: 1700,
     alerts: {
-      entryDesc: '等縮量守穩 1,500–1,580 再建倉。',
-      breakoutDesc: '帶量突破 1,620 元確認多頭延續，目標上看 2,100 元。',
+      entryDesc: '連三日縮量整理，進場條件趨近成熟。縮量守穩 1,560 以上即建首批 30% 試單。',
+      breakoutDesc: '帶量突破 1,700 元確認多頭延續，目標上看 2,100 元。',
       slDesc: '跌破 1,380 元（-13%），AI 手機滲透率預期下修，停損出場。',
-      tp1Desc: '達 1,800 元出 1/3 部位（+12%），停損上移成本，剩餘續抱。',
-      tp2Desc: '達 2,100 元再出 1/3（+31%），最後 1/3 跟 5 日線移動停利。',
+      tp1Desc: '達 1,800 元出 1/3 部位（+14%），停損上移成本，剩餘續抱。',
+      tp2Desc: '達 2,100 元再出 1/3（+32%），最後 1/3 跟 5 日線移動停利。',
     },
     catalysts: [
-      { date: '2026/04', title: 'Q1 財報', desc: '法人預估 EPS，若優於預期可確認 AI 手機/車用晶片成長動能。' },
-      { date: '2026 上半年', title: 'Dimensity 旗艦晶片放量', desc: '天璣 9400+ 打入更多品牌旗艦機，市佔率提升催化股價。' },
-      { date: '2026 下半年', title: 'ASIC / 車用晶片營收佔比提升', desc: '非手機業務營收占比突破 50%，推動評價重估。' },
+      { date: '2026/04/29', title: 'Q1 財報', desc: '2025 EPS 66.16 元歷史新高，Q1 財報前是重要觀察點。' },
+      { date: '2026 上半年', title: 'Google TPU v7e 量產', desc: 'Google TPU 量產進度順利，2026 ASIC 營收目標 10 億美元。' },
+      { date: '2026 下半年', title: 'ASIC / 車用晶片營收佔比提升', desc: '非手機業務營收占比突破 50%，法人目標均值 2,099 元，推動評價重估。' },
     ]
   }
 };
@@ -831,21 +831,21 @@ function renderAdvicePanel() {
     if (closes.length > 0) {
       const sig = evaluateSignal(sid, price, closes, chip);
       sigStatus = sig.status;
-      // 細分 WATCH 子狀態
+      // 細分 WATCH 子狀態，優先使用手動設定的 status
       if (sigStatus === 'WATCH') {
-        if (price > s.entry[1] && s.status === '暫停追進') {
-          sigLabel = '暫停追進';
-        } else if (price > s.entry[1]) {
-          sigLabel = '等待回測';
-        } else {
-          sigLabel = '等待反彈';
-        }
+        if (s.status === '暫停追進') sigLabel = '暫停追進';
+        else if (s.status === '等待止跌') sigLabel = '等待止跌';
+        else if (s.status === '接近進場') sigLabel = '接近進場';
+        else if (price > s.entry[1]) sigLabel = '等待回測';
+        else sigLabel = '等待反彈';
+      } else if (sigStatus === 'BUY' && s.status === '接近進場') {
+        sigLabel = '接近進場';
       } else {
         sigLabel = sigToLabel[sigStatus] || sigStatus;
       }
     } else {
       // API 未載入，用靜態設定
-      sigStatus = s.status === '進場訊號' ? 'BUY' : 'WATCH';
+      sigStatus = (s.status === '進場訊號' || s.status === '接近進場') ? 'BUY' : 'WATCH';
       sigLabel = s.status;
     }
 
@@ -890,7 +890,7 @@ function renderAdvicePanel() {
   }
 
   document.getElementById('adviceSection').innerHTML = `
-    <h3>操作建議（3/26 更新）</h3>
+    <h3>操作建議（3/27 更新）</h3>
     <div class="advice-grid">${cards}</div>`;
 }
 
